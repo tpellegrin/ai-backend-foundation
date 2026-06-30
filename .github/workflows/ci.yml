@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: test-stub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Lint
+        run: make lint
+
+      - name: Typecheck
+        run: make typecheck
+
+      - name: Unit & API Tests
+        run: make test
+
+      - name: Lint Imports
+        run: uv run lint-imports
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: test-stub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run Integration Tests
+        run: make test-int
+
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build .
