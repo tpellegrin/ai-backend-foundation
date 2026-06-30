@@ -25,7 +25,19 @@ These resolve known cross-cutting ambiguities. They override any literal reading
 
 ---
 
-## 2. Global rules (apply to every task; no exceptions)
+## 2. Repository State Awareness
+
+The implementation of Phase 2 is a sequential process. The following rules govern how to handle the evolving state of the repository:
+
+1. **Early tasks intentionally operate on an incomplete repository.** Not all tooling (MyPy, coverage, etc.) will pass perfectly in the first few tasks. This is expected.
+2. **Future files must never be created early.** Do not create `app/__init__.py`, `app/main.py`, or any other file listed in a future task just to make a linter or test runner happy.
+3. **Command failures caused by repository incompleteness should be reported, not worked around.** If `mypy` fails because the `app/` package doesn't exist yet (before T-107), report the failure and explain that the package is not yet part of the plan. Do not create the package early.
+4. **Task boundaries always take precedence over making commands pass.** Your primary obligation is to satisfy the current task's requirements and allowed files, not to achieve a green build by pulling in future work.
+5. **Coverage expectations evolve.** A 80% coverage gate is impossible when zero lines of production code exist. In such cases, report the coverage result (even if 0%) and proceed if the tests required for the current task pass.
+
+---
+
+## 3. Global rules (apply to every task; no exceptions)
 
 These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human review. A task is **not done** if it violates any of them.
 
@@ -64,7 +76,7 @@ These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human 
 
 ---
 
-## 3. Allowed-files discipline
+## 4. Allowed-files discipline
 
 - You may create/modify **only** files explicitly listed in the current task's `Allowed files` block, **plus** `app/<module>/__init__.py` re-exports when re-exporting a new symbol added in the same task. Editing any other file is a failure.
 - When `Allowed files` says `tests` (shorthand) or omits an explicit test path, you are required (and authorized) to create the test files listed under the same task's `Tests required` block, at their canonical locations (see Global rule #24).
@@ -73,7 +85,10 @@ These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human 
 
 ---
 
-## 4. Command discipline
+## 5. Command discipline
+
+- **Expected vs. Implementation Failures.** Explicitly distinguish between failures caused by your implementation (which must be fixed) and expected failures caused by the current incomplete state of the repository (which should be reported).
+- If a required command fails because future tasks have not yet been implemented: **stop, explain why, report it, do not create future code, and do not weaken architecture.**
 
 - Run **every** command listed under the current task's `Commands` block. A task is **not done** until they all succeed.
 - At minimum, run `make lint typecheck test`. Run `make test-int` and `make check` when the task lists them.
@@ -84,7 +99,7 @@ These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human 
 
 ---
 
-## 5. Stop signals (request guidance — do not improvise)
+## 6. Stop signals (request guidance — do not improvise)
 
 Stop and request guidance when any of the following is true:
 
@@ -98,7 +113,7 @@ The lower-complexity model is **not authorized** to make architectural decisions
 
 ---
 
-## 6. Instructions for the lower-complexity implementation model
+## 7. Instructions for the lower-complexity implementation model
 
 You are an executor, not a designer. Follow these rules without exception:
 
@@ -115,5 +130,6 @@ You are an executor, not a designer. Follow these rules without exception:
 11. **Never invent prompts.** All prompts live in `app/prompts/library/*.yaml` (T-1002 is the only Phase 2 prompt).
 12. **Never call provider SDKs directly.** All providers are accessed via `app.llm.service` / `app.embeddings.service` and adapters wired in `app.core.wiring.*`.
 13. **Stop signals.** Stop and request guidance when: (a) a contract would need to be weakened, (b) a forbidden import seems required, (c) a test from a previous task is failing after your change, (d) a dependency listed in "Depends on" is not yet complete.
+14. **Repository State Awareness.** Adhere to the rules in Section 2. Never create future files or weaken the architecture to satisfy tooling. Report expected failures due to repo incompleteness.
 
 Final reminder: the lower-complexity model is **not authorized** to make architectural decisions. If the plan is wrong or incomplete, report — do not "fix it".

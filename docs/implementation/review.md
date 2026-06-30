@@ -25,7 +25,7 @@ You are a strict reviewer. Approve only when every item below is true.
 6. **Types.** `mypy --strict` clean on `app/`. Every `# type: ignore` carries a rule code and a one-line reason.
 7. **Observability.** All logs via structlog. Every external HTTP via `app/infrastructure/http/`. Every LLM call records an `LLMCallObservation` with all 11 fields and opens an OTel span.
 8. **Errors.** All errors are `AppError` subclasses and serialize as RFC 9457 Problem Details at the edge. No stack traces, SQL, secrets, or provider raw bodies in error bodies.
-9. **Scope discipline.** No new top-level folders, no new dependencies beyond the task's allow-list, no out-of-scope features. **Reject broad, clever, or architecture-changing changes.** If unsure whether something is in scope: reject.
+9. **Scope discipline.** No new top-level folders, no new dependencies beyond the task's allow-list, no out-of-scope features. **Reject broad, clever, or architecture-changing changes.** No implementation from future tasks was introduced simply to satisfy tooling. If unsure whether something is in scope: reject.
 10. **Documentation.** New edges in the dependency graph or new ports require `importlinter.toml` and dep-graph doc updates in the same PR.
 11. **ADR for architectural deltas.** Any change that affects a public interface, dependency, or rule requires an ADR.
 
@@ -42,6 +42,7 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
   - [ ] No SDK import outside its dedicated adapter file.
   - [ ] No `os.environ` outside `app/core/config/`.
   - [ ] No cross-module persistence/adapters imports.
+  - [ ] No implementation from future tasks was introduced simply to satisfy tooling.
 - Types & layering
   - [ ] `domain.py` is pure; no FastAPI / SQLAlchemy / httpx / SDK imports.
   - [ ] `service.py` returns domain types only.

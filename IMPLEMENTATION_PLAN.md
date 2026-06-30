@@ -43,6 +43,7 @@ None blocking. The revision pack (`01-contradictions.md`) resolved C-1..C-10 alr
 - **Container is incremental.** `app/core/container.py` (T-504) starts with the **minimal** set of fields wired by tasks already completed. Each later wiring task (T-708, T-1212, T-1402, T-1503) **appends** its field. A task may not reference a Container field that has not yet been added.
 - **Makefile arrives in T-103.** Tasks T-101 and T-102 must not invoke `make ...` in their `Commands` block; they use the equivalent `uv run` commands directly. Every later task may use `make ...`.
 - **`importlinter` runs at every phase.** Contracts in T-107 validate cleanly against an empty/skeleton `app/` package (T-107 creates a minimal `app/__init__.py` so `lint-imports` has a target). The same contracts continue to apply unchanged after every later task adds modules.
+- **Repository State Awareness.** Early tasks operate on an incomplete repository. Future files (like `app/__init__.py` before T-107) must never be created early to satisfy tooling. Command failures caused by repository incompleteness should be reported, not worked around. Task boundaries take precedence over making commands pass. Coverage requirements evolve with the repository state.
 - **ai_governance domain/ports precede `app.llm.service`.** A standalone task T-1100 (ai_governance domain + ports only) executes before T-1102. The remaining ai_governance tasks (T-1201..T-1206) stay in S12 as scheduled.
 
 ---
@@ -51,7 +52,7 @@ None blocking. The revision pack (`01-contradictions.md`) resolved C-1..C-10 alr
 
 1. **Read first, in order:**
    1. `AGENTS.md` (architectural law)
-   2. [`docs/implementation/rules.md`](docs/implementation/rules.md) (global rules, stop signals, allowed-files discipline, command discipline, lower-complexity model instructions)
+   2. [`docs/implementation/rules.md`](docs/implementation/rules.md) (global rules, Repository State Awareness, stop signals, allowed-files discipline, command discipline, lower-complexity model instructions)
    3. This file's §3 (dependency map) and §4 (task index)
    4. The specific task file you are about to execute, at [`docs/implementation/tasks/T-XXX.md`](docs/implementation/tasks/)
    5. [`docs/implementation/review.md`](docs/implementation/review.md) (so you know exactly what the reviewer will check)
