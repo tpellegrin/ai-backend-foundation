@@ -1,0 +1,24 @@
+services:
+  api:
+    volumes:
+      - ./app:/app/app
+    ports:
+      - "8000:8000"
+
+  worker:
+    volumes:
+      - ./app:/app/app
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  otel-collector:
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
