@@ -55,3 +55,47 @@ dev = [
 [tool.uv]
 managed = true
 package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", "I", "B", "UP", "N", "S", "ANN", "ASYNC", "RUF", "C4", "SIM", "PL", "PT", "TRY", "T20"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ANN"]
+"alembic/**" = ["INP001"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+files = ["app"]
+plugins = ["pydantic.mypy"]
+follow_imports = "normal"
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+markers = [
+    "unit",
+    "integration",
+    "api",
+    "contract",
+    "slow",
+]
+addopts = "--strict-markers --cov=app --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["app/**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
