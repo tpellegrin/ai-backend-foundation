@@ -1,0 +1,7 @@
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# JetBrains
+.idea/
