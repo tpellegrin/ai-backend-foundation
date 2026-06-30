@@ -21,6 +21,7 @@ These resolve known cross-cutting ambiguities. They override any literal reading
 - **Container is incremental.** `app/core/container.py` (T-504) starts with the **minimal** set of fields wired by tasks already completed. Each later wiring task (T-708, T-1212, T-1402, T-1503) **appends** its field. A task may not reference a Container field that has not yet been added.
 - **Makefile arrives in T-103.** Tasks T-101 and T-102 must not invoke `make ...` in their `Commands` block; they use the equivalent `uv run` commands directly. Every later task may use `make ...`.
 - **`importlinter` runs at every phase.** Contracts in T-107 validate cleanly against an empty/skeleton `app/` package (T-107 creates a minimal `app/__init__.py` so `lint-imports` has a target). The same contracts continue to apply unchanged after every later task adds modules.
+- **`import-linter` config filename is `.importlinter`** at the repository root, INI format. This is one of the three filenames `import-linter` auto-discovers (the others being `setup.cfg` and `pyproject.toml`). A standalone `importlinter.toml` is **not** auto-discovered and is forbidden — it forces a `--config` flag that drifts between Makefile, pre-commit, CI, and tests. Configuration must also **not** be inlined into `pyproject.toml` (T-102 owns that file). Every invocation site — Makefile, pre-commit, CI, the `tests/test_imports.py` shell-out — must use the bare command `uv run lint-imports` (no `--config` flag). T-107 introduces the file; later tasks may only append contracts.
 - **`ai_governance` domain/ports precede `app.llm.service`.** A standalone task T-1100 (ai_governance domain + ports only) executes before T-1102. The remaining ai_governance tasks (T-1201..T-1206) stay in S12 as scheduled.
 
 ---
@@ -34,6 +35,7 @@ The implementation of Phase 2 is a sequential process. The following rules gover
 3. **Command failures caused by repository incompleteness should be reported, not worked around.** If `mypy` fails because the `app/` package doesn't exist yet (before T-107), report the failure and explain that the package is not yet part of the plan. Do not create the package early.
 4. **Task boundaries always take precedence over making commands pass.** Your primary obligation is to satisfy the current task's requirements and allowed files, not to achieve a green build by pulling in future work.
 5. **Coverage expectations evolve.** A 80% coverage gate is impossible when zero lines of production code exist. In such cases, report the coverage result (even if 0%) and proceed if the tests required for the current task pass.
+6. **Empty `import-linter` layers/sources are valid.** `import-linter`'s `layers`, `forbidden`, and `independence` contracts are vacuously satisfied when their referenced packages do not yet exist or contain no imports. Do **not** scaffold future `app/<module>/__init__.py` files early to "populate" a layer named in `.importlinter`. The contract still passes; report the (empty) pass and move on.
 
 ---
 
@@ -95,7 +97,8 @@ These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human 
 - Tasks T-101 and T-102 predate the Makefile (T-103) and use the `uv run ...` equivalents declared in their own `Commands` blocks.
 - After T-103, all later tasks may use `make ...`.
 - **Do not bypass quality gates.** No `# type: ignore` without rule code + one-line reason. No `noqa` without a code. No `@pytest.mark.skip` to silence failure. No deleting failing tests. No `-DskipTests`-style escapes.
-- When introducing a new allowed cross-module edge, update `importlinter.toml` **and** `docs/dependency-graph.md` **in the same task**.
+- When introducing a new allowed cross-module edge, update `.importlinter` **and** `docs/dependency-graph.md` **in the same task**.
+- Do not add `--config <path>` to any `lint-imports` invocation (Makefile target, pre-commit hook, CI step, or test shell-out). Rely on auto-discovery of `.importlinter`. Adding an explicit path hides config-filename mistakes and creates drift between invocation sites.
 
 ---
 
@@ -125,7 +128,7 @@ You are an executor, not a designer. Follow these rules without exception:
 6. **Write the listed tests.** Tests must fail before the implementation and pass after.
 7. **Run the listed Commands.** A task is not done until they all succeed. Always run `make lint typecheck test` at minimum. Run `make test-int` and `make check` when listed.
 8. **Do not bypass quality gates.** No `# type: ignore` without rule code + one-line reason. No `noqa` without a code. No `@pytest.mark.skip` to silence failure. No deleting failing tests.
-9. **Update `importlinter.toml` and `docs/dependency-graph.md` in the same task** when introducing a new allowed edge.
+9. **Update `.importlinter` and `docs/dependency-graph.md` in the same task** when introducing a new allowed edge.
 10. **Report after each task:** files created/modified, tests added, commands executed, all command outputs (or final status), and any unresolved issues. If a task can't be completed without violating a rule, **stop and report** — do not modify other files to make it work.
 11. **Never invent prompts.** All prompts live in `app/prompts/library/*.yaml` (T-1002 is the only Phase 2 prompt).
 12. **Never call provider SDKs directly.** All providers are accessed via `app.llm.service` / `app.embeddings.service` and adapters wired in `app.core.wiring.*`.
