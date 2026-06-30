@@ -1,0 +1,57 @@
+[project]
+name = "ai-backend-foundation"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[dependency-groups]
+main = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "pgvector",
+    "redis",
+    "arq",
+    "httpx",
+    "tenacity",
+    "structlog",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-instrumentation-fastapi",
+    "opentelemetry-instrumentation-httpx",
+    "opentelemetry-instrumentation-sqlalchemy",
+    "opentelemetry-instrumentation-redis",
+    "opentelemetry-exporter-otlp",
+    "argon2-cffi",
+    "pyjwt[crypto]",
+    "jinja2",
+    "pyyaml",
+    "python-multipart",
+]
+test = [
+    { include-group = "main" },
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "httpx",
+    "testcontainers[postgresql,redis]",
+    "respx",
+    "freezegun",
+    "dirty-equals",
+]
+dev = [
+    { include-group = "test" },
+    "ruff",
+    "mypy",
+    "import-linter",
+    "pre-commit",
+    "types-pyyaml",
+]
+
+[tool.uv]
+managed = true
+package = false
