@@ -1,0 +1,124 @@
+[importlinter]
+root_packages =
+    app
+
+# NOTE: Missing future packages are represented as optional layers using
+# parentheses (e.g. (app.main)) in the 'layers' contract.
+# For 'independence' and 'forbidden' contracts, recursive wildcards (e.g.
+# app.module.**) are used to allow the contracts to pass even when modules
+# do not yet exist.
+# Future ignore_imports entries must be added only when the matching import
+# actually exists. Dummy imports and dummy package markers are strictly forbidden.
+
+[importlinter:contract:layers]
+name = Layers
+type = layers
+layers =
+    (app.main)
+    (app.api)
+    (app.core)
+    (app.auth) | (app.users) | (app.documents) | (app.rag) | (app.ai) | (app.ai_governance)
+    (app.llm) | (app.embeddings) | (app.prompts)
+    (app.platform)
+    (app.infrastructure)
+    (app.observability)
+    (app.shared)
+
+[importlinter:contract:capabilities-independent]
+name = Capabilities are independent
+type = independence
+modules =
+    app.llm.**
+    app.embeddings.**
+    app.prompts.**
+
+[importlinter:contract:ai-rag-independent]
+name = ai and rag are independent
+type = independence
+modules =
+    app.ai.**
+    app.rag.**
+
+[importlinter:contract:auth-no-users]
+name = auth does not import users
+type = forbidden
+source_modules =
+    app.auth.**
+forbidden_modules =
+    app.users.**
+
+[importlinter:contract:core-wiring-only-infra]
+name = Only core.wiring imports infrastructure
+type = forbidden
+source_modules =
+    app.shared.**
+    app.observability.**
+    app.platform.**
+    app.llm.**
+    app.embeddings.**
+    app.prompts.**
+    app.auth.**
+    app.users.**
+    app.documents.**
+    app.rag.**
+    app.ai.**
+    app.ai_governance.**
+    app.api.**
+    app.main.**
+forbidden_modules =
+    app.infrastructure.**
+
+[importlinter:contract:platform-bottom]
+name = Platform is below everything except shared
+type = forbidden
+source_modules =
+    app.platform.**
+forbidden_modules =
+    app.infrastructure.**
+    app.llm.**
+    app.embeddings.**
+    app.prompts.**
+    app.auth.**
+    app.users.**
+    app.documents.**
+    app.rag.**
+    app.ai.**
+    app.ai_governance.**
+    app.api.**
+    app.core.**
+    app.main.**
+
+# Contract 7: No cross-module persistence/adapters imports
+[importlinter:contract:no-cross-persistence]
+name = No cross-module persistence/adapters imports
+type = forbidden
+source_modules =
+    app.**
+forbidden_modules =
+    app.auth.persistence.**
+    app.users.persistence.**
+    app.documents.persistence.**
+    app.rag.persistence.**
+    app.ai.persistence.**
+    app.ai_governance.persistence.**
+    app.auth.adapters.**
+    app.ai.tools.**
+    app.ai.memory.**
+allow_indirect_imports = True
+
+# NOTE: Future ignore_imports exceptions must be added only when the matching
+# import actually exists. Each exception must be justified by the dependency
+# graph / ADR. Unmatched exceptions are forbidden because Import Linter treats
+# them as config errors.
+# ignore_imports =
+#     app.auth.* -> app.auth.persistence
+#     app.users.* -> app.users.persistence
+#     app.documents.* -> app.documents.persistence
+#     app.rag.* -> app.rag.persistence
+#     app.ai.* -> app.ai.persistence
+#     app.ai_governance.* -> app.ai_governance.persistence
+#     app.auth.* -> app.auth.adapters
+#     app.ai.* -> app.ai.tools
+#     app.ai.* -> app.ai.memory
+#     app.core.wiring.* -> *
+#     alembic.* -> *
