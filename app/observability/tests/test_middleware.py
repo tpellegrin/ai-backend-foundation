@@ -52,11 +52,17 @@ def test_access_log_middleware_emits_log(capsys: CaptureFixture[str]) -> None:
 
 
 @pytest.mark.unit
-def test_access_log_middleware_with_user(capsys: CaptureFixture[str]) -> None:
+def test_access_log_middleware_user_id_is_always_none_pre_auth(
+    capsys: CaptureFixture[str],
+) -> None:
+    """
+    Until the auth subsystem lands (T-701+), the access log must not guess a
+    user shape. `user_id` is always logged as ``None``, even when the ASGI
+    scope carries an unrelated `user` object.
+    """
     configure_logging(level="INFO", json=True)
 
     async def endpoint(request: Request) -> Response:
-        # Simulate auth middleware setting user in scope
         request.scope["user"] = {"id": "user_123"}
         return JSONResponse({"status": "ok"})
 
@@ -71,33 +77,7 @@ def test_access_log_middleware_with_user(capsys: CaptureFixture[str]) -> None:
     access_logs = [json.loads(line) for line in log_lines if line.strip()]
     access_log = next(log for log in access_logs if log.get("event") == "access_log")
 
-    assert access_log["user_id"] == "user_123"
-
-
-@pytest.mark.unit
-def test_access_log_middleware_with_user_object(capsys: CaptureFixture[str]) -> None:
-    configure_logging(level="INFO", json=True)
-
-    class User:
-        id = "user_456"
-
-    async def endpoint(request: Request) -> Response:
-        # Simulate auth middleware setting user in scope as an object
-        request.scope["user"] = User()
-        return JSONResponse({"status": "ok"})
-
-    app = Starlette(routes=[Route("/", endpoint)])
-    app.add_middleware(AccessLogMiddleware)
-
-    client = TestClient(app)
-    client.get("/")
-
-    captured = capsys.readouterr()
-    log_lines = captured.out.strip().split("\n")
-    access_logs = [json.loads(line) for line in log_lines if line.strip()]
-    access_log = next(log for log in access_logs if log.get("event") == "access_log")
-
-    assert access_log["user_id"] == "user_456"
+    assert access_log["user_id"] is None
 
 
 @pytest.mark.unit

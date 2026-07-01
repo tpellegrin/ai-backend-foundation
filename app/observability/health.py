@@ -1,5 +1,7 @@
 import asyncio
-from typing import Any, Protocol, runtime_checkable
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from fastapi import APIRouter, Response, status
 
@@ -7,120 +9,100 @@ from app.observability.logging import get_logger
 
 logger = get_logger(__name__)
 
+ProbeStatus = Literal["ok", "degraded", "error"]
+
+
+@dataclass(frozen=True)
+class ProbeResult:
+    """Result of running a single probe."""
+
+    name: str
+    status: ProbeStatus
+    latency_ms: int | None = None
+
 
 @runtime_checkable
-class HealthProbe(Protocol):
-    """
-    Protocol for a health probe.
-    Each probe must have a name and a check method.
+class Probe(Protocol):
+    """Protocol for a health probe. Implementations must expose a ``name``
+    attribute and an async ``check()`` returning a :class:`ProbeResult`.
     """
 
     name: str
 
-    async def check(self) -> bool:
-        """
-        Perform the health check.
-        Returns True if healthy, False otherwise.
-        """
-        ...
+    async def check(self) -> ProbeResult: ...
 
 
-class HealthRegistry:
-    """
-    Registry for health probes and app startup state.
+class ProbeRegistry:
+    """Immutable, pure container that composes zero or more probes.
+
+    The registry itself performs no I/O and holds no global state; it only
+    fans out to the probes it was constructed with, in deterministic order.
     """
 
-    def __init__(self) -> None:
-        self._probes: list[HealthProbe] = []
-        self._startup_complete: bool = False
+    __slots__ = ("_probes",)
 
-    def register_probe(self, probe: HealthProbe) -> None:
-        """Register a new health probe."""
-        self._probes.append(probe)
-
-    def mark_startup_complete(self) -> None:
-        """Mark the application startup as complete."""
-        self._startup_complete = True
+    def __init__(self, probes: Iterable[Probe] = ()) -> None:
+        self._probes: tuple[Probe, ...] = tuple(probes)
 
     @property
-    def is_startup_complete(self) -> bool:
-        """Return True if application startup is complete."""
-        return self._startup_complete
+    def probes(self) -> tuple[Probe, ...]:
+        return self._probes
 
-    async def check_all(self) -> dict[str, bool]:
-        """
-        Run all registered probes and return their results.
-        Returns an empty dict if no probes are registered.
-        """
-        if not self._probes:
-            return {}
-
-        results = await asyncio.gather(*(self._safe_check(probe) for probe in self._probes))
-
-        return {probe.name: res for probe, res in zip(self._probes, results, strict=True)}
-
-    async def _safe_check(self, probe: HealthProbe) -> bool:
-        """
-        Run a single probe safely, catching any exceptions and applying a timeout.
-        """
-        try:
-            # Default 5 second timeout for probes to avoid blocking
-            return await asyncio.wait_for(probe.check(), timeout=5.0)
-        except Exception:
-            # Any failure or timeout is considered unhealthy
-            logger.exception("health_probe_failed", probe=probe.name)
-            return False
+    async def run_all(self) -> Sequence[ProbeResult]:
+        """Run all probes in registration order and return their results."""
+        if not self.probes:
+            return ()
+        return await asyncio.gather(*(_safe_check(probe) for probe in self.probes))
 
 
-# Global instance to be used by the app and core.wiring
-health_registry = HealthRegistry()
+async def _safe_check(probe: Probe) -> ProbeResult:
+    """Run a single probe safely, catching exceptions and applying a timeout."""
+    try:
+        return await asyncio.wait_for(probe.check(), timeout=5.0)
+    except Exception:
+        logger.exception("health_probe_failed", probe=probe.name)
+        return ProbeResult(name=probe.name, status="error")
 
-router = APIRouter()
+
+def _all_ok(results: Sequence[ProbeResult]) -> bool:
+    return all(r.status == "ok" for r in results)
 
 
-@router.get("/livez")
-async def livez() -> dict[str, str]:
+def _results_payload(results: Sequence[ProbeResult]) -> dict[str, str]:
+    return {r.name: r.status for r in results}
+
+
+def build_health_router(registry: ProbeRegistry, *, is_ready: Callable[[], bool]) -> APIRouter:
+    """Build a health APIRouter bound to the given probe registry and readiness callable.
+
+    Endpoints:
+      * ``/livez``  — process liveness; performs no I/O and no probe evaluation.
+      * ``/healthz``— runs the registry's probes; 200 if all ok, 503 otherwise.
+      * ``/readyz`` — consults ``is_ready()`` and runs probes; 503 if either fails.
     """
-    Liveness probe.
-    Returns 200 as long as the process is running.
-    Does NOT perform any I/O.
-    """
-    return {"status": "ok"}
+    router = APIRouter()
 
+    @router.get("/livez")
+    async def livez() -> dict[str, str]:
+        return {"status": "ok"}
 
-@router.get("/healthz")
-async def healthz(response: Response) -> dict[str, Any]:
-    """
-    Health probe.
-    Returns 200 if all registered probes (DB, Redis, etc.) pass.
-    Returns 503 if any probe fails.
-    """
-    probe_results = await health_registry.check_all()
-    all_ok = all(probe_results.values())
+    @router.get("/healthz")
+    async def healthz(response: Response) -> dict[str, Any]:
+        results = await registry.run_all()
+        if not _all_ok(results):
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {"status": "error", "probes": _results_payload(results)}
+        return {"status": "ok"}
 
-    if not all_ok:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "error", "probes": probe_results}
+    @router.get("/readyz")
+    async def readyz(response: Response) -> dict[str, Any]:
+        if not is_ready():
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {"status": "starting"}
+        results = await registry.run_all()
+        if not _all_ok(results):
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {"status": "error", "probes": _results_payload(results)}
+        return {"status": "ok"}
 
-    return {"status": "ok"}
-
-
-@router.get("/readyz")
-async def readyz(response: Response) -> dict[str, Any]:
-    """
-    Readiness probe.
-    Returns 200 if startup is complete AND all health probes pass.
-    Returns 503 otherwise.
-    """
-    if not health_registry.is_startup_complete:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "starting"}
-
-    probe_results = await health_registry.check_all()
-    all_ok = all(probe_results.values())
-
-    if not all_ok:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "error", "probes": probe_results}
-
-    return {"status": "ok"}
+    return router

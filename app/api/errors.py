@@ -1,11 +1,8 @@
-from http import HTTPStatus
-
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.observability import get_logger, request_id_var
 from app.shared.errors import AppError
@@ -15,6 +12,14 @@ logger = get_logger(__name__)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    """Install the three T-501 exception handlers.
+
+    Service and domain code must raise :class:`AppError` subclasses only.
+    ``HTTPException`` raised from below ``api.py`` is intentionally *not*
+    mapped here — it is caught by the fallback :class:`Exception` handler and
+    reported as a generic 500, which surfaces the misuse instead of hiding it.
+    """
+
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
         request_id = request_id_var.get()
@@ -54,30 +59,6 @@ def register_exception_handlers(app: FastAPI) -> None:
 
         return JSONResponse(
             status_code=422,
-            content=problem.model_dump(exclude_none=True),
-            headers={"X-Request-ID": request_id} if request_id else {},
-            media_type=MEDIA_TYPE,
-        )
-
-    @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        request_id = request_id_var.get()
-
-        try:
-            title = HTTPStatus(exc.status_code).phrase
-        except ValueError:
-            title = "HTTP error"
-
-        problem = ProblemDetails(
-            title=title,
-            status=exc.status_code,
-            detail=str(exc.detail),
-            code=f"http-{exc.status_code}",
-            request_id=request_id,
-        )
-
-        return JSONResponse(
-            status_code=exc.status_code,
             content=problem.model_dump(exclude_none=True),
             headers={"X-Request-ID": request_id} if request_id else {},
             media_type=MEDIA_TYPE,

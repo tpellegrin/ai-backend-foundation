@@ -12,8 +12,11 @@ logger = get_logger(__name__)
 class AccessLogMiddleware(BaseHTTPMiddleware):
     """
     Middleware that emits a single structured access log per request.
-    It logs method, path, status, duration_ms, and request_id.
-    It does not set, read, or modify HTTP response headers.
+    Logs method, path, status, duration_ms, and request_id (via logging processor).
+
+    ``user_id`` is intentionally ``None`` at this phase: no auth subsystem
+    exists yet, and guessing its shape would prematurely lock a contract
+    that T-701+ has not defined.
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
@@ -23,23 +26,13 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
 
         duration_ms = int((time.perf_counter() - start_time) * 1000)
 
-        # user_id (if available) - checking request.scope for common user keys
-        user_id = None
-        user = request.scope.get("user")
-        if user:
-            # Try to get id from user object or dict
-            if hasattr(user, "id"):
-                user_id = str(user.id)
-            elif isinstance(user, dict) and "id" in user:
-                user_id = str(user["id"])
-
         logger.info(
             "access_log",
             method=request.method,
             path=request.url.path,
             status=response.status_code,
             duration_ms=duration_ms,
-            user_id=user_id,
+            user_id=None,
         )
 
         return response

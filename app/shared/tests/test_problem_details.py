@@ -88,3 +88,41 @@ def test_no_leaks_for_unknown_errors() -> None:
     assert data["status"] == 500
     assert data["detail"] == "Something went wrong"
     assert data["request_id"] == "req-789"
+
+
+@pytest.mark.unit
+def test_from_app_error_extras_cannot_override_reserved_fields() -> None:
+    """
+    Reserved ProblemDetails fields (type, title, status, detail, instance,
+    code, request_id) must not be overridable via AppError.extras.
+    """
+    hostile_extras = {
+        "type": "hijacked-type",
+        "title": "hijacked-title",
+        "status": 999,
+        "detail": "hijacked-detail",
+        "instance": "hijacked-instance",
+        "code": "hijacked-code",
+        "request_id": "hijacked-request-id",
+        "safe_key": "kept",
+    }
+    err = AppError(
+        code="original-code",
+        title="Original title",
+        status=418,
+        detail="Original detail",
+        extras=hostile_extras,
+    )
+
+    problem = from_app_error(err, request_id="req-canonical")
+
+    assert problem.title == "Original title"
+    assert problem.status == 418
+    assert problem.detail == "Original detail"
+    assert problem.code == "original-code"
+    assert problem.request_id == "req-canonical"
+    assert problem.type == "about:blank"
+    assert problem.instance is None
+
+    # Only the non-reserved extra survives.
+    assert problem.model_extra == {"safe_key": "kept"}

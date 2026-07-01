@@ -6,56 +6,70 @@ from fastapi import FastAPI
 from starlette import status
 from starlette.testclient import TestClient
 
-from app.observability.health import HealthProbe, health_registry, router
-
-
-@pytest.fixture
-def client() -> TestClient:
-    app = FastAPI()
-    app.include_router(router)
-    return TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def reset_registry() -> None:
-    # Reset registry before each test to ensure isolation
-    health_registry._probes = []
-    health_registry._startup_complete = False
+from app.observability.health import (
+    ProbeRegistry,
+    ProbeResult,
+    build_health_router,
+)
 
 
 class MockProbe:
-    """Mock health probe for testing."""
+    """Mock probe implementing the Probe protocol."""
 
-    def __init__(self, name: str, healthy: bool = True) -> None:
+    def __init__(
+        self,
+        name: str,
+        result_status: str = "ok",
+    ) -> None:
         self.name = name
-        self.healthy = healthy
+        self._status = result_status
         self.called = False
 
-    async def check(self) -> bool:
+    async def check(self) -> ProbeResult:
         self.called = True
-        return self.healthy
+        return ProbeResult(name=self.name, status=self._status)  # type: ignore[arg-type]
+
+
+class ExplodingProbe:
+    """Probe that raises when evaluated. Used to assert /livez performs no I/O."""
+
+    name = "explode"
+
+    async def check(self) -> ProbeResult:
+        msg = "probe must not be evaluated"
+        raise AssertionError(msg)
+
+
+def _client(registry: ProbeRegistry, is_ready: bool = True) -> TestClient:
+    app = FastAPI()
+    app.include_router(build_health_router(registry, is_ready=lambda: is_ready))
+    return TestClient(app)
 
 
 @pytest.mark.unit
-def test_livez_returns_200(client: TestClient) -> None:
+def test_livez_returns_200_and_performs_no_io() -> None:
+    # Probe would explode if evaluated; /livez must not touch it.
+    registry = ProbeRegistry([ExplodingProbe()])
+    client = _client(registry)
+
     response = client.get("/livez")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"status": "ok"}
 
 
 @pytest.mark.unit
-def test_healthz_no_probes_returns_200(client: TestClient) -> None:
+def test_healthz_no_probes_returns_200() -> None:
+    client = _client(ProbeRegistry())
     response = client.get("/healthz")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"status": "ok"}
 
 
 @pytest.mark.unit
-def test_healthz_all_probes_passing_returns_200(client: TestClient) -> None:
-    probe1 = MockProbe("db", healthy=True)
-    probe2 = MockProbe("redis", healthy=True)
-    health_registry.register_probe(probe1)
-    health_registry.register_probe(probe2)
+def test_healthz_all_probes_ok_returns_200() -> None:
+    probe1 = MockProbe("db")
+    probe2 = MockProbe("redis")
+    client = _client(ProbeRegistry([probe1, probe2]))
 
     response = client.get("/healthz")
     assert response.status_code == status.HTTP_200_OK
@@ -65,86 +79,70 @@ def test_healthz_all_probes_passing_returns_200(client: TestClient) -> None:
 
 
 @pytest.mark.unit
-def test_healthz_one_probe_failing_returns_503(client: TestClient) -> None:
-    probe1 = MockProbe("db", healthy=False)
-    probe2 = MockProbe("redis", healthy=True)
-    health_registry.register_probe(probe1)
-    health_registry.register_probe(probe2)
+def test_healthz_one_probe_failing_returns_503() -> None:
+    client = _client(ProbeRegistry([MockProbe("db", result_status="error"), MockProbe("redis")]))
 
     response = client.get("/healthz")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    data = response.json()
-    assert data["status"] == "error"
-    assert data["probes"] == {"db": False, "redis": True}
+    body = response.json()
+    assert body["status"] == "error"
+    assert body["probes"] == {"db": "error", "redis": "ok"}
 
 
 @pytest.mark.unit
-def test_readyz_before_startup_returns_503(client: TestClient) -> None:
+def test_readyz_returns_503_when_not_ready_even_if_probes_pass() -> None:
+    client = _client(ProbeRegistry([MockProbe("db")]), is_ready=False)
     response = client.get("/readyz")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert response.json() == {"status": "starting"}
 
 
 @pytest.mark.unit
-def test_readyz_after_startup_returns_200(client: TestClient) -> None:
-    health_registry.mark_startup_complete()
+def test_readyz_returns_200_when_ready_and_probes_pass() -> None:
+    client = _client(ProbeRegistry([MockProbe("db")]), is_ready=True)
     response = client.get("/readyz")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"status": "ok"}
 
 
 @pytest.mark.unit
-def test_readyz_after_startup_failing_probe_returns_503(client: TestClient) -> None:
-    health_registry.mark_startup_complete()
-    probe1 = MockProbe("db", healthy=False)
-    health_registry.register_probe(probe1)
-
+def test_readyz_returns_503_when_ready_but_probe_fails() -> None:
+    client = _client(
+        ProbeRegistry([MockProbe("db", result_status="error")]),
+        is_ready=True,
+    )
     response = client.get("/readyz")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert response.json()["status"] == "error"
 
 
 @pytest.mark.unit
-def test_probe_exception_handled_as_failure(client: TestClient) -> None:
-    class ExplodingProbe:
+def test_probe_exception_recorded_as_error() -> None:
+    class Boom:
         name = "boom"
 
-        async def check(self) -> bool:
-            raise RuntimeError("Boom")
+        async def check(self) -> ProbeResult:
+            raise RuntimeError("boom")
 
-    # ExplodingProbe matches HealthProbe protocol at runtime
-    health_registry.register_probe(ExplodingProbe())
-
+    client = _client(ProbeRegistry([Boom()]))
     response = client.get("/healthz")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert response.json()["probes"] == {"boom": False}
+    assert response.json()["probes"] == {"boom": "error"}
 
 
 @pytest.mark.unit
-def test_probe_timeout_handled_as_failure(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Use a very short timeout for testing to avoid slowing down tests
+def test_registry_evaluates_probes_in_registration_order() -> None:
+    order: list[str] = []
 
-    class SlowProbe:
-        name = "slow"
+    class Tracer:
+        def __init__(self, name: str) -> None:
+            self.name = name
 
-        async def check(self) -> bool:
-            await asyncio.sleep(0.2)
-            return True
+        async def check(self) -> ProbeResult:
+            order.append(self.name)
+            return ProbeResult(name=self.name, status="ok")
 
-    health_registry.register_probe(SlowProbe())
-
-    # Temporarily set a shorter timeout for the registry
-
-    async def _short_safe_check(probe: HealthProbe) -> bool:
-        try:
-            return await asyncio.wait_for(probe.check(), timeout=0.1)
-        except Exception:
-            return False
-
-    monkeypatch.setattr(health_registry, "_safe_check", _short_safe_check)
-
-    response = client.get("/healthz")
-    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert response.json()["probes"] == {"slow": False}
+    registry = ProbeRegistry([Tracer("a"), Tracer("b"), Tracer("c")])
+    results = asyncio.run(registry.run_all())
+    assert [r.name for r in results] == ["a", "b", "c"]
+    assert order == ["a", "b", "c"]

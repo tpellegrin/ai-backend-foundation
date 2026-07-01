@@ -43,7 +43,7 @@ def app() -> FastAPI:
 
     @app.get("/unhandled-error")
     async def raise_unhandled_error() -> None:
-        raise ValueError("unhandled")
+        raise ValueError("secret-stacktrace-marker-should-not-leak")
 
     return app
 
@@ -93,20 +93,29 @@ def test_validation_error_mapping(client: TestClient) -> None:
 
 
 @pytest.mark.api
-def test_http_error_mapping(client: TestClient) -> None:
+def test_http_exception_is_not_normalized_to_problem_details(client: TestClient) -> None:
+    """
+    HTTPException raised from anywhere below `api.py` must not be silently
+    mapped into RFC 9457 Problem Details. T-501 registers exactly three
+    handlers (AppError, RequestValidationError, and the fallback Exception);
+    HTTPException is intentionally not in that list. It therefore falls
+    through to FastAPI/Starlette's default handler, which surfaces the
+    misuse (`{"detail": ...}` in `application/json`) instead of hiding it
+    behind a canonical error envelope. Domain/service code must raise
+    :class:`AppError` subclasses, per AGENTS.md §12.
+    """
     token = request_id_var.set("test-request-id")
     try:
         response = client.get("/http-error")
 
-        assert response.status_code == 403
-        assert response.headers["Content-Type"] == "application/problem+json"
-        assert response.headers["X-Request-ID"] == "test-request-id"
+        # The default Starlette handler runs — not our Problem Details path.
+        assert response.headers["Content-Type"] != "application/problem+json"
 
         data = response.json()
-        assert data["code"] == "http-403"
-        assert data["title"] == "Forbidden"
-        assert data["detail"] == "Forbidden detail"
-        assert data["request_id"] == "test-request-id"
+        # No Problem Details shape.
+        assert "code" not in data
+        assert "title" not in data
+        assert "request_id" not in data
     finally:
         request_id_var.reset(token)
 
@@ -125,5 +134,11 @@ def test_unhandled_error_mapping(client: TestClient) -> None:
         assert data["code"] == "internal-error"
         assert data["title"] == "Internal server error"
         assert data["request_id"] == "test-request-id"
+
+        # No exc.args, stack trace, or ValueError repr must leak into the body.
+        body = response.text
+        assert "secret-stacktrace-marker-should-not-leak" not in body
+        assert "ValueError" not in body
+        assert "Traceback" not in body
     finally:
         request_id_var.reset(token)
