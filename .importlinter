@@ -22,7 +22,7 @@ layers =
     (app.platform)
     (app.infrastructure)
     (app.observability)
-    (app.shared)
+    app.shared
 
 [importlinter:contract:capabilities-independent]
 name = Capabilities are independent
