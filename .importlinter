@@ -21,7 +21,7 @@ layers =
     (app.llm) | (app.embeddings) | (app.prompts)
     (app.platform)
     (app.infrastructure)
-    (app.observability)
+    app.observability
     app.shared
 
 [importlinter:contract:capabilities-independent]
