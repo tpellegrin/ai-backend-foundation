@@ -35,6 +35,8 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
 
 ## 2. Final review checklist (used by human and reviewer model on every PR)
 
+> Checklist items may cite pattern IDs (e.g., "Sanitizes reserved fields per P-3"). See [`./patterns.md`](./patterns.md) for the full pattern catalog.
+
 - Architecture
   - [ ] No new top-level folder under `app/` outside the established set.
   - [ ] No `app.infrastructure.*` import outside `app.core.wiring.*`.

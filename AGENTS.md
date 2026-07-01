@@ -226,6 +226,8 @@ Specific anti-patterns to **not** introduce:
 
 Defer until justified: GraphQL, WebSockets, microservice split, DDD aggregates, event sourcing, multi-modal pipelines.
 
+For concrete idioms (registries, builders, sanitization, test naming), see [`docs/implementation/patterns.md`](docs/implementation/patterns.md).
+
 ---
 
 ## 15. When in doubt

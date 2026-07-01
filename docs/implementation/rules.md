@@ -15,6 +15,8 @@
 
 These resolve known cross-cutting ambiguities. They override any literal reading of an individual task that would conflict with them.
 
+For concrete idioms (registries, builders, sanitization, test naming), see [`./patterns.md`](./patterns.md).
+
 - **C-2 clarification.** OTel exporters and providers are constructed inside `app/core/wiring/`. `app/observability/` only exposes config types, middleware factories, and the `request_id_var` context var. Do not import OTel exporters from `app/observability/`.
 - **C-4 clarification.** One type per role per module. `domain.py` → frozen dataclasses (Pydantic only for validation-heavy value objects). `api.py` → Pydantic v2 request/response. `persistence.py` → SQLAlchemy mapped. **Never** mix.
 - **S3 storage adapter is Phase 3.** Phase 2 ships **only** the local-FS `BlobStorage` adapter. Settings, `.env.example`, docker-compose, and wiring must not assume S3 in Phase 2. Task T-705 is removed; `aioboto3` does not enter Phase 2.

@@ -1,0 +1,185 @@
+# Implementation patterns
+
+> Concrete implementation idioms approved for this repository.
+> These are **not** contracts (see [`../../AGENTS.md`](../../AGENTS.md)) and **not** process
+> (see [`./rules.md`](./rules.md)); they are the shape of code that reviewers approve
+> without discussion.
+>
+> Companion files:
+> - Contract layer (CI-enforceable): [`../../AGENTS.md`](../../AGENTS.md)
+> - Execution discipline / stop signals: [`./rules.md`](./rules.md)
+> - Final review checklist: [`./review.md`](./review.md)
+
+## Precedence
+
+- Patterns describe **preferred** implementation shapes, not mandatory contracts.
+- If a task specification conflicts with a pattern, the **task specification takes precedence**.
+- If the pattern seems better than the task spec, **update the task spec first** instead of silently deviating from either.
+
+## Audience
+
+- **Implementers** should use these as copyable shapes when writing new code.
+- **Reviewers** should request these patterns unless there is a documented reason not to.
+
+---
+
+## Patterns to copy
+
+### P-1. Injectable, immutable registries
+- **Rule.** Registries are constructor-injected value objects. The composition
+  root (later `app.core.wiring`) owns instantiation; the library only defines
+  the shape.
+- **Reference.** `app/observability/health.py::ProbeRegistry`.
+- **Anti-pattern displaced.** AP-1 (module-level mutable singleton).
+- **Rule of thumb.** If a symbol at module scope holds mutable state, it is wrong.
+
+### P-2. Pure `build_*` factories
+- **Rule.** Router/adapter/middleware assembly is a function that returns a
+  fresh object, taking its dependencies as keyword-only parameters. No
+  decorators wired at import time, no import-time side effects.
+- **Reference.** `build_health_router(registry, *, is_ready)` in
+  `app/observability/health.py`.
+- **Anti-pattern displaced.** AP-2 (stateful `mark_startup_complete()` inside
+  the library it configures).
+
+### P-3. Reserved-field sanitization at the serialization boundary
+- **Rule.** When merging caller-supplied dicts (`extras`, metadata, tags) into
+  a canonical Pydantic model with `extra="allow"`, filter reserved keys
+  **before** the `**` splat.
+- **Reference.** `app/shared/problem_details.py::from_app_error` filters
+  `AppError.extras` against `_RESERVED_FIELDS`.
+- **Anti-pattern displaced.** AP-3 (unfiltered `**user_dict` into `extra="allow"`).
+- **Test-name example.** `test_from_app_error_extras_cannot_override_reserved_fields`.
+
+### P-4. Three-handler error surface (no "helpful" fourth)
+- **Rule.** The API edge maps exactly `AppError`, `RequestValidationError`,
+  and fallback `Exception` to Problem Details. Anything else (including
+  `StarletteHTTPException`) intentionally falls through so misuse is visible.
+- **Reference.** `app/api/errors.py::register_exception_handlers`.
+- **Anti-pattern displaced.** AP-4 (adding an extra handler because a test
+  raised the wrong exception type).
+- **Test-name example.** `test_http_exception_is_not_normalized_to_problem_details`.
+
+### P-5. Reject speculative future integrations
+- **Rule.** Do not encode a subsystem shape that does not exist yet. If auth
+  is T-701+, the access log emits `user_id=None` today — full stop.
+- **Reference.** `AccessLogMiddleware` in `app/observability/middleware.py`.
+- **Anti-pattern displaced.** AP-5 (`hasattr(user, "id")` / `isinstance(user, dict)`
+  shape-guessing for an unshipped subsystem).
+- **Test-name example.** `test_access_log_middleware_user_id_is_always_none_pre_auth`.
+
+### P-6. Single-responsibility ASGI/Starlette middleware
+- **Rule.** Each middleware does one thing (correlation, access log, security
+  headers…), composes cleanly, and does not leak concerns across boundaries.
+- **Reference.** `app/observability/correlation.py::CorrelationMiddleware`
+  (only sets `request_id_var`) and `app/observability/middleware.py::AccessLogMiddleware`
+  (only emits one `access_log` event).
+
+### P-7. Logging style: structlog, one processor per concern
+- **Rule.** Every processor is a small pure function of shape
+  `(_logger, _method_name, event_dict) -> Mapping[str, Any]`. Configuration
+  is one function (`configure_logging(level, json)`). No ad-hoc
+  `logging.getLogger`, no `print`.
+- **Reference.** `app/observability/logging.py` — `add_request_id`,
+  `event_renamer`, `get_logger`.
+
+### P-8. Test naming = behavior + boundary
+- **Rule.** Test names read like specifications. Prefer long over cute; name
+  the boundary being defended.
+- **Examples.**
+  - `test_http_exception_is_not_normalized_to_problem_details`
+  - `test_from_app_error_extras_cannot_override_reserved_fields`
+  - `test_access_log_middleware_user_id_is_always_none_pre_auth`
+  - `test_access_log_middleware_no_header_side_effects` (also asserts T-502
+    fields are *absent* — protects task boundary from silently drifting).
+
+### P-9. Test structure: one file per module surface
+- **Rule.**
+  1. Every test file scopes to a single source module.
+  2. Every test carries an explicit marker: `@pytest.mark.unit` or `@pytest.mark.api`.
+  3. Fixtures build a fresh `FastAPI()` + `TestClient(..., raise_server_exceptions=False)`
+     per test — no shared app.
+  4. `request_id_var.set(...)` is wrapped in `try/finally` with `reset(token)`
+     so contextvars never leak between tests.
+- **Reference.** `app/api/tests/test_error_handlers.py`.
+
+### P-10. Fakes/stubs live inline until a second consumer appears
+- **Rule.** A fake stays in the test file that uses it. It is not promoted to
+  `conftest.py` or a `tests/fakes/` folder until a real second consumer exists.
+- **Reference.** `MockAppError` at the top of
+  `app/api/tests/test_error_handlers.py`.
+- **Anti-pattern displaced.** AP-6 (promoting a one-off fake into
+  `conftest.py` before a second consumer exists). See also `rules.md` §4
+  (allowed-files policy) and AGENTS.md §14.
+
+### P-11. Leak-negative assertions on error paths
+- **Rule.** When a body could leak secrets, assert the *absence* of specific
+  markers, not just the presence of expected fields.
+- **Reference.** `test_unhandled_error_mapping`:
+  ```python
+  body = response.text
+  assert "secret-stacktrace-marker-should-not-leak" not in body
+  assert "ValueError" not in body
+  assert "Traceback" not in body
+  ```
+- **Anti-pattern displaced.** AP-9 (assertions that only check the happy shape).
+
+### P-12. Docstrings explain *why the code is absent*, not just what is present
+- **Rule.** When a shape is deliberately narrower than a naive reader would
+  expect, the docstring must say so and point at the governing rule.
+- **Reference.** Docstring of `register_exception_handlers` in
+  `app/api/errors.py` (explains why `HTTPException` is *not* mapped), and
+  docstring of `test_http_exception_is_not_normalized_to_problem_details`
+  (points at AGENTS.md §12).
+
+---
+
+## Anti-patterns to avoid
+
+Anti-patterns reviewers should reject. Each has previously caused a review finding in this repository.
+
+- **AP-1.** Module-level mutable singletons (`registry = Registry()` at
+  import time). Displaced by **P-1**.
+- **AP-2.** Stateful `mark_startup_complete()` living inside the library it
+  configures. Displaced by **P-2**.
+- **AP-3.** `**user_dict` splat into a Pydantic model with `extra="allow"`
+  without a reserved-key filter. Displaced by **P-3**.
+- **AP-4.** Adding an extra error handler because a test raised the wrong
+  exception type. Displaced by **P-4**.
+- **AP-5.** `hasattr(x, "id") or isinstance(x, dict)` shape-guessing for a
+  subsystem that has not shipped. Displaced by **P-5**.
+- **AP-6.** Promoting a one-off fake into `conftest.py` before a second
+  consumer exists. Displaced by **P-10**.
+- **AP-7.** Reimplementing a stdlib / structlog processor when the built-in
+  fits — *unless* the substitution is not purely mechanical. `event_renamer`
+  was correctly kept because `structlog.processors.EventRenamer` renames a
+  fixed source key and does not cover the "msg → event when event is empty"
+  case.
+- **AP-8.** Broad `except Exception:` in error paths that does not log via
+  `structlog` with `exc_info` and mark the OTel span errored. See AGENTS.md §12.
+- **AP-9.** Assertions that only check the happy shape and never assert the
+  *absence* of leaked internals. Displaced by **P-11**.
+
+---
+
+## Maintaining this document
+
+Update or review this catalog:
+
+- After a review-fix introduces a reusable code shape.
+- After the same review finding appears more than once.
+- After a task exposes a recurring ambiguity that a pattern would have prevented.
+- Before major new sections land — for example persistence, auth, LLM, RAG.
+- During retrospective audits every 5–10 tasks.
+
+Rules for edits:
+
+- **Do not** add patterns for one-off decisions; wait for a second occurrence.
+- **Do not** duplicate content from [`../../AGENTS.md`](../../AGENTS.md) (contracts) or
+  [`./rules.md`](./rules.md) (execution discipline). Link, do not restate.
+- Every new pattern must include:
+  1. a one-line **rule**,
+  2. a canonical **reference** file/symbol in the current tree,
+  3. the **anti-pattern displaced**, if any.
+  Optional: a representative test-name example.
+- Prefer editing an existing pattern over adding a near-duplicate; patterns should stay small in number.
