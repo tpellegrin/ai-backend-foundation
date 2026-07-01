@@ -91,6 +91,8 @@ S01 Foundation/tooling
 
 Hard ordering rules (do not violate):
 
+- **S04 execution order is `T-402 → T-401 → T-403 → T-404 → T-405`, not lexical by task id.** T-401 (`logging.py`) reads `request_id_var` from T-402 (`correlation.py`), so the leaf task T-402 lands first. The task index below enumerates by number for readability; the dependency-driven order above is binding. See `docs/implementation/rules.md` §1.
+- **Health probes and `/api/v1` router are wired incrementally across S04/S05.** T-405 ships only pure endpoint shapes and a `ProbeRegistry`; T-504 injects probes and owns the `app.state.ready` flag; T-505 mounts the health router with an `is_ready` closure. T-503 ships an empty `/api/v1` mount point; each module task appends its `include_router(...)` line in the same PR that introduces the module's `api.py`. See `docs/implementation/rules.md` §1.
 - OpenAI LLM/embedding adapters (S11) require: `app.llm.domain`, `app.embeddings.domain`, settings (S03), HTTP client (S07), observability (S04).
 - Document ingestion (S13–S15) requires: documents persistence (S13), blob storage (S07), queue (S14), embeddings (S11), vector store (S15).
 - RAG (S16) requires: settings (S03), DB (S07), platform ports (S06), prompts (S10), embeddings port (S11), vector store (S15), `ai_governance` (S12).
