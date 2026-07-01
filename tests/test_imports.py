@@ -1,6 +1,7 @@
-import pytest
 import shutil
 import subprocess
+
+import pytest
 
 
 @pytest.mark.unit
