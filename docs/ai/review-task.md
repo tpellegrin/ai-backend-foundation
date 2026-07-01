@@ -107,12 +107,56 @@ You are not required to find issues in every dimension. You are required to
 
 - **PASS** — zero blocking, zero major, zero minor. NITs allowed.
 - **PASS WITH MINOR ISSUES** — zero blocking, zero major, ≤ 2 minor.
-  The implementer must address the minors before commit. Any resulting diff
-  must go through `review-task.md` again before commit, even if the fix is
-  mechanical.
+  Minor issues must be resolved before commit. The reviewer may either:
+  - leave the fixes to the implementer via `apply-review.md`; or
+  - apply them directly under **Reviewer patch authority** below.
 - **FAIL** — any blocking, any major, or > 2 minor.
 
 When in doubt between two verdicts, choose the stricter one.
+
+---
+
+## Reviewer patch authority
+
+When the verdict is **PASS WITH MINOR ISSUES**, the reviewer may apply the
+minor fixes directly **only** if every condition below is true:
+
+1. Each fix is mechanical and local.
+2. Each fix addresses an explicitly listed **MINOR** finding.
+3. No behavior, architecture, dependency direction, public interface, task scope,
+   dependency, or file ownership changes.
+4. No files outside the current task's Allowed files are modified.
+5. No new tests are skipped, weakened, deleted, or made less specific.
+6. The reviewer can re-run the relevant task commands after the patch.
+
+Allowed reviewer patches include:
+
+- naming consistency fixes,
+- comment or docstring wording fixes,
+- import ordering or formatting that tooling would make anyway,
+- test name clarification,
+- small configuration key/comment corrections that do not change behavior.
+
+Forbidden reviewer patches include:
+
+- any **BLOCKING** or **MAJOR** fix,
+- adding features or behavior,
+- changing architecture or task boundaries,
+- adding/removing dependencies,
+- creating new files unless the current task already allowed that exact file,
+- modifying implementation logic beyond the named minor issue,
+- resolving ambiguity by making a design choice.
+
+If the reviewer applies a patch, they must update the verdict report with a
+`REVIEWER PATCHES APPLIED` section and then re-run the review on the final diff.
+The final report may be **PASS** only if no blocking, major, or minor findings
+remain after the patch.
+
+If a minor issue is not safe under this section, do not patch it. Return
+**PASS WITH MINOR ISSUES** and hand the findings to `apply-review.md`.
+
+For **FAIL**, the reviewer must not patch the implementation. The diff goes back
+to the implementer with the findings list.
 
 ---
 
@@ -133,6 +177,10 @@ FINDINGS
 - [MINOR]    <file:line> — ...
 - [NIT]      <file:line> — ...
 (omit a severity block entirely if it has no findings)
+
+REVIEWER PATCHES APPLIED (omit if none)
+- [MINOR] <finding ref> -> <file:line> — <one-line description of mechanical fix>
+- Commands re-run: <commands> -> <result>
 
 DIMENSIONS
 - Task fidelity:      clean | issues (ref finding ids)
