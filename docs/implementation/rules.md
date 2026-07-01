@@ -66,7 +66,7 @@ These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human 
 21. Do not add TODO comments as substitutes for implementation.
 22. A module's public surface is **only** what its `__init__.py` re-exports. Other modules must import from `__init__.py`, not from internal files (except `api.py` for the API mounting layer and `persistence.py` mapped classes only within the same module).
 23. Each task must update `importlinter.toml` if it introduces a new allowed edge. Each task must keep `make check` passing.
-24. **"Allowed files" includes the test files named in "Tests required".** Whenever a task's `Allowed files` says `tests` (shorthand) or omits an explicit test path, the implementer is **required** (and thereby authorized) to create the test files listed in that same task's `Tests required` block under the canonical locations: co-located unit/contract tests at `app/<module>/tests/test_<name>.py`, API tests at `tests/api/test_<name>.py`, integration tests at `tests/integration/test_<name>.py`. No other files may be created.
+24. **"Allowed files" always includes the task-local test files required by "Tests required".** See §4 for the full policy: task-local tests are allowed at their canonical locations; module `__init__.py` may be edited **only** to re-export a public symbol introduced by the current task; nothing else (helpers, `conftest.py`, migrations, config keys, docs) is implicitly in scope — the task spec must name every support file, otherwise stop and report.
 25. **The "standard four" Commands block** referenced by many tasks is exactly:
     ```
     make fmt
@@ -80,10 +80,26 @@ These rules are enforced by `import-linter`, `ruff`, `mypy --strict`, and human 
 
 ## 4. Allowed-files discipline
 
-- You may create/modify **only** files explicitly listed in the current task's `Allowed files` block, **plus** `app/<module>/__init__.py` re-exports when re-exporting a new symbol added in the same task. Editing any other file is a failure.
-- When `Allowed files` says `tests` (shorthand) or omits an explicit test path, you are required (and authorized) to create the test files listed under the same task's `Tests required` block, at their canonical locations (see Global rule #24).
+The `Allowed files` block is the exhaustive list of files an implementer may create or modify for a task, with three narrowly scoped exceptions codified below. Anything else is a scope violation and must be reported (`Stop signals`, §6), not silently added.
+
+**Policy — what is always allowed on top of the literal `Allowed files` list:**
+
+1. **Task-local tests required by the task itself.** Every test file listed under the task's `Tests required` block is allowed, at the canonical locations:
+   - co-located unit / contract tests → `app/<module>/tests/test_<name>.py`
+   - API tests → `tests/api/test_<name>.py` (or `app/<module>/tests/test_api.py` when the task explicitly says so)
+   - integration tests (Testcontainers, DB, Redis, Arq, pgvector) → `tests/integration/test_<name>.py`
+
+   This applies whether `Allowed files` uses the shorthand `tests`, names the test file explicitly, or omits it entirely. If `Tests required` refers to a test that lives in a **different** task ("see T-XXX", "regression test in T-YYY"), do **not** create it under the current task — that test file belongs to the other task's `Allowed files`.
+
+2. **Module `__init__.py` re-exports — only when required.** You may edit `app/<module>/__init__.py` **only** to re-export a public symbol introduced by the current task. You may not edit an `__init__.py` for any other reason (imports for side effects, reordering, comments, unused re-exports). If the current task adds no new public symbol, do not touch `__init__.py`. If the task creates a new module directory, its `__init__.py` must be listed explicitly under `Allowed files`.
+
+3. **Nothing else is implicitly allowed.** No helpers, shared fixtures, `conftest.py`, package `__init__.py` files, migrations, `.env.example` keys, docs, or configuration are implicitly in scope. If the task genuinely needs any such support file, that file **must** appear by name in the task's `Allowed files`. If it does not, the task is under-scoped: **stop and report** — do not add the file.
+
+**Other allowed-files rules:**
+
 - Forbidden imports/files/patterns listed under `Forbidden` must not appear. If you believe you need them, **stop and report** — do not modify other files to make it work.
 - Never add files under top-level forbidden folder names: `models/`, `schemas/`, `routers/`, `services/`, `repositories/`, `utils/`, `common/`, `helpers/`.
+- Reviewers **must** treat task-local test files required by `Tests required` as in-scope, per bullet 1 above, and must not flag them as scope violations. Reviewers **must** flag any file that is not covered by the literal `Allowed files` list or by bullets 1–2 above.
 
 ---
 

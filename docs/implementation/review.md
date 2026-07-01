@@ -25,7 +25,7 @@ You are a strict reviewer. Approve only when every item below is true.
 6. **Types.** `mypy --strict` clean on `app/`. Every `# type: ignore` carries a rule code and a one-line reason.
 7. **Observability.** All logs via structlog. Every external HTTP via `app/infrastructure/http/`. Every LLM call records an `LLMCallObservation` with all 11 fields and opens an OTel span.
 8. **Errors.** All errors are `AppError` subclasses and serialize as RFC 9457 Problem Details at the edge. No stack traces, SQL, secrets, or provider raw bodies in error bodies.
-9. **Scope discipline.** No new top-level folders, no new dependencies beyond the task's allow-list, no out-of-scope features. **Reject broad, clever, or architecture-changing changes.** No implementation from future tasks was introduced simply to satisfy tooling. If unsure whether something is in scope: reject.
+9. **Scope discipline.** No new top-level folders, no new dependencies beyond the task's allow-list, no out-of-scope features. **Reject broad, clever, or architecture-changing changes.** No implementation from future tasks was introduced simply to satisfy tooling. If unsure whether something is in scope: reject. Apply the allowed-files policy in `rules.md` §4 literally — see §4 of this document for its reviewer projection.
 10. **Documentation.** New edges in the dependency graph or new ports require `importlinter.toml` and dep-graph doc updates in the same PR.
 11. **ADR for architectural deltas.** Any change that affects a public interface, dependency, or rule requires an ADR.
 
@@ -102,7 +102,23 @@ Use this checklist as a final gate after the per-PR checklist (§2). A PR may no
 
 ---
 
-## 4. Final golden-path acceptance test (summary)
+## 4. Allowed-files policy (reviewer projection of `rules.md` §4)
+
+Reviewers must judge scope against the following, in this exact order:
+
+1. **Literal `Allowed files` list.** Every file in the diff must be either literally listed there or covered by bullets 2–3 below.
+2. **Task-local test files required by `Tests required`.** A test file at its canonical location (`app/<module>/tests/test_<name>.py`, `tests/api/test_<name>.py`, or `tests/integration/test_<name>.py`) is in scope whenever `Tests required` in the same task calls for it, whether `Allowed files` uses the shorthand `tests`, names the file explicitly, or omits it. **Do not flag such tests as scope violations.** If the required test lives in a different task ("see T-XXX"), it does **not** belong to the current diff — flag it as a scope violation there.
+3. **`app/<module>/__init__.py` re-exports of a symbol introduced by the current task.** Any other change to an `__init__.py` (side-effect imports, reordering, reintroducing unused re-exports, touching an unrelated module's `__init__.py`) is a scope violation.
+
+Everything else — helpers, shared fixtures, `conftest.py`, migrations, `.env.example` keys, docs, additional config keys — is out of scope unless the task lists the file by name. If the diff needs such a file to succeed, the correct verdict is **FAIL**: the task is under-scoped and must be revised, not silently patched.
+
+**Reviewer patch authority reminder.** Reviewer patches under `docs/ai/review-task.md` are still bounded by the current task's `Allowed files` **and** the three bullets above; they do not extend scope. A reviewer must not add a support file to close a minor finding.
+
+**Current-codebase review.** Ground every judgment in the actual repository state at the time of the diff. Do not reject on the basis of a future task's expected outcome, and do not accept a change that anticipates a future task by pulling files in early.
+
+---
+
+## 5. Final golden-path acceptance test (summary)
 
 The acceptance bar for closing Phase 2 is **mechanically** the union of:
 

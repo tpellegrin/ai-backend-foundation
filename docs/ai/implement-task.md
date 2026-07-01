@@ -38,9 +38,16 @@ on demand, but the five above are the load-bearing context.
 
 You **must**:
 
-- Modify only files listed under the task's **Allowed files** (or files
-  explicitly authorized by `rules.md`, e.g. `pyproject.toml` when a task adds
-  a dependency the task itself names).
+- Modify only files listed under the task's **Allowed files**, plus the two
+  narrow exceptions codified in `docs/implementation/rules.md` §4:
+  (a) task-local test files required by the task's **Tests required** block,
+  at their canonical locations (`app/<module>/tests/test_<name>.py`,
+  `tests/api/test_<name>.py`, `tests/integration/test_<name>.py`);
+  (b) an `app/<module>/__init__.py` re-export line **only** when this task
+  introduces a new public symbol that must be exposed on the module surface.
+  Nothing else is implicitly in scope — no helpers, `conftest.py`, extra
+  migrations, docs, or `.env.example` keys. If the task needs such a file,
+  stop and report; do **not** add it.
 - Honor every **Forbidden** clause in the task.
 - Follow the dependency direction in
   `docs/phase-2-revision/03-revised-dependency-graph.md`. No upward imports.

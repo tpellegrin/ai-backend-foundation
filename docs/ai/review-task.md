@@ -47,7 +47,17 @@ For each dimension, decide: clean / minor / blocking. Severity definitions
 are in the next section.
 
 1. **Task fidelity.** Does the diff do exactly what the task says, no more,
-   no less? Files modified ⊆ Allowed files. Forbidden clauses respected.
+   no less? Files modified ⊆ **Allowed files ∪ task-local tests required by
+   the task's `Tests required` block ∪ `__init__.py` re-exports of symbols
+   introduced by this task** (the exact policy is in
+   `docs/implementation/rules.md` §4 and its reviewer projection in
+   `docs/implementation/review.md` §4). Forbidden clauses respected.
+   Do **not** flag task-local test files as scope violations when the task
+   requires them. Do flag any other unlisted file (helpers, `conftest.py`,
+   extra migrations, docs, `.env.example` edits) as a BLOCKING scope
+   violation — the task is under-scoped, not the diff over-broad by design.
+   Ground the review in the **current repository state**, not in what a
+   future task is expected to add.
 2. **Architecture compliance.** No new top-level forbidden folders. Vertical
    slice respected. `domain.py` pure. Pydantic/ORM/domain types not mixed.
 3. **Dependency direction.** Layer order respected
