@@ -58,6 +58,7 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
   - [ ] All raised errors subclass `AppError`.
   - [ ] No raw provider responses or stack traces in error bodies.
   - [ ] Every error response is `application/problem+json`.
+  - [ ] Error handlers must not silently encourage `HTTPException` from below `api.py` (only `AppError`, `RequestValidationError`, and the fallback `Exception` are mapped to Problem Details).
 - Observability
   - [ ] All logs via `structlog` (no `print`, no ad-hoc `logging.getLogger`).
   - [ ] Every response carries `X-Request-ID`.
