@@ -72,6 +72,9 @@ are in the next section.
    contract / settings). No `skip`, `xfail`, or weakened assertions to pass
    CI. Integration tests use Testcontainers — pgvector is not faked when
    retrieval is being validated. Coverage gate respected.
+   Test module basenames must be globally unique across the repository
+   (test dirs are not packaged, so pytest's rootdir import mode rejects
+   duplicate basenames at collection time — see `rules.md` §4).
 6. **Observability.** Logs via `structlog`. External HTTP via
    `app.infrastructure.http`. LLM calls via `app.llm.service` with full
    `LLMCallObservation` (11 fields) and an OTel span. `X-Request-ID` echo on
