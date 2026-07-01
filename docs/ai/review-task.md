@@ -107,9 +107,12 @@ You are not required to find issues in every dimension. You are required to
 
 - **PASS** — zero blocking, zero major, zero minor. NITs allowed.
 - **PASS WITH MINOR ISSUES** — zero blocking, zero major, ≤ 2 minor.
-  Minor issues must be resolved before commit. The reviewer may either:
-  - leave the fixes to the implementer via `apply-review.md`; or
-  - apply them directly under **Reviewer patch authority** below.
+  Minor issues must be resolved before commit. When operating in **Code mode**
+  and every finding is a safe mechanical fix (see **Reviewer patch authority**
+  below), the reviewer **must** apply the fixes directly, re-run the task
+  checks, and re-review the final diff. Only when at least one finding is
+  **unsafe** for reviewer patching does the reviewer hand the findings back to
+  the implementer via `apply-review.md`.
 - **FAIL** — any blocking, any major, or > 2 minor.
 
 When in doubt between two verdicts, choose the stricter one.
@@ -129,28 +132,42 @@ minor fixes directly **only** if every condition below is true:
 5. No new tests are skipped, weakened, deleted, or made less specific.
 6. The reviewer can re-run the relevant task commands after the patch.
 
-Allowed reviewer patches include:
+Safe mechanical fixes (the reviewer **must** apply these directly when in
+Code mode and the verdict is PASS WITH MINOR ISSUES):
 
+- removing unused or no-op test fixtures, helpers, or dead code the finding
+  already flagged,
 - naming consistency fixes,
-- comment or docstring wording fixes,
+- comment or docstring wording fixes (including dropping stale TODO-shaped
+  comments the finding already flagged),
 - import ordering or formatting that tooling would make anyway,
 - test name clarification,
-- small configuration key/comment corrections that do not change behavior.
+- small configuration key/comment or `noqa` scope corrections that do not
+  change behavior.
 
-Forbidden reviewer patches include:
+Unsafe fixes (the reviewer **must not** patch these; hand them back to the
+implementer via `apply-review.md`):
 
 - any **BLOCKING** or **MAJOR** fix,
-- adding features or behavior,
-- changing architecture or task boundaries,
-- adding/removing dependencies,
+- behavior changes (control flow, return values, side effects),
+- architecture, dependency-direction, or task-boundary changes,
+- adding or removing dependencies,
 - creating new files unless the current task already allowed that exact file,
+- new tests, or existing tests whose semantics or assertions would change,
+- anything touching files outside the current task's Allowed list,
 - modifying implementation logic beyond the named minor issue,
 - resolving ambiguity by making a design choice.
 
-If the reviewer applies a patch, they must update the verdict report with a
-`REVIEWER PATCHES APPLIED` section and then re-run the review on the final diff.
-The final report may be **PASS** only if no blocking, major, or minor findings
-remain after the patch.
+If the reviewer applies a patch, they must:
+
+1. update the verdict report with a `REVIEWER PATCHES APPLIED` section,
+2. re-run the task's `Commands` block (at minimum `make lint typecheck test`,
+   plus `lint-imports` when the diff touches module boundaries),
+3. **re-review the final diff** as if freshly received, and
+4. return **PASS** before the change is committed. The final report may be
+   **PASS** only if no blocking, major, or minor findings remain after the
+   patch. If any new finding surfaces, the verdict reverts to PASS WITH MINOR
+   ISSUES or FAIL and the normal rules apply.
 
 If a minor issue is not safe under this section, do not patch it. Return
 **PASS WITH MINOR ISSUES** and hand the findings to `apply-review.md`.
