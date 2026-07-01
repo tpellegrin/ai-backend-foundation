@@ -26,6 +26,19 @@ These resolve known cross-cutting ambiguities. They override any literal reading
 - **Health probes are wired incrementally across S04/S05.** T-405 ships only the endpoint shapes and a pure `ProbeRegistry` (no `app.state` reads, no `core.wiring` imports, no lifespan). T-504 injects the real probes (DB now; Redis/vector/queue as their wiring tasks land) into the registry stored on the `Container` and owns the `app.state.ready` readiness flag via the lifespan. T-505 mounts the health router with `is_ready = lambda: app.state.ready` and the container's probe registry. Docker-compose healthcheck assertions belong to T-507. Later wiring tasks (T-708, T-1212, T-1402, T-1503) append their probes to the registry in the same PR that adds their `Container` field.
 - **The `/api/v1` router is incremental.** T-503 ships an empty `build_v1_router()` mount point at prefix `/api/v1`. Each module task (`auth`, `users`, `prompts`, `governance`, `documents`, `rag`) appends its own `include_router(...)` line in the same PR that introduces the module's `api.py`. A task may not reference a module router that has not yet been added by its owning task. This mirrors the incremental-`Container` rule above.
 - **S04 execution order is `T-402 → T-401 → T-403 → T-404 → T-405`, not lexical.** T-401 depends on T-402 (`correlation.request_id_var`), so the leaf task T-402 must land first. The task index in `IMPLEMENTATION_PLAN.md` enumerates tasks by number but this dependency order is the binding execution order for S04.
+- **Append-only edits to shared assembly files.** The incremental `Container`, `/api/v1` router, and probe-registry rules above imply that certain tasks must edit files not "owned" by the current task. To make this explicit and to keep `Allowed files` blocks authoritative:
+    - Every task that introduces a module `api.py` (`auth`, `users`, `prompts`, `governance`, `documents`, `rag` — i.e. T-907, T-910, T-1003, T-1205, T-1305, T-1602) **must list `app/api/v1.py`** in its `Allowed files`. The only permitted edit there is **one** `router.include_router(<module>.api.router, prefix=..., tags=[...])` line appended to `build_v1_router()`.
+    - Every wiring task under S07/S12/S14/S15 (T-708, T-1212, T-1402, T-1503) **must list `app/core/container.py`** and **`app/core/lifespan.py`** in its `Allowed files`. The only permitted edits there are: (a) appending the task's dataclass field(s) to `Container`, (b) appending the task's startup/shutdown hook(s) to the lifespan, and (c) appending the task's probe(s) to the probe registry when applicable.
+    - "Append-only" means: no reordering of existing fields/lines, no rewriting of prior tasks' hooks, no removal of anything landed by an earlier task. A task that needs to modify an existing line must instead **stop and report**.
+    - This clause **narrowly extends** §4's Allowed-files discipline for these specific shared files only. It does not authorize edits to any other file outside a task's literal `Allowed files` list.
+- **Alembic migration numbering registry.** Alembic revisions in `alembic/versions/` are assigned by module-owning task, not by execution order, to prevent collisions if tasks land out of sequence. The reserved prefixes for Phase 2 are:
+    - `0001_base` — T-802 (initial schema + `vector` extension).
+    - `0002_auth` — T-905 (auth tables).
+    - `0003_users` — T-910 (users tables).
+    - `0004_governance` — T-1202 (ai_governance tables).
+    - `0005_documents` — T-1304 (documents + chunks + embeddings tables).
+    - `0006_rag` — reserved for RAG-owned tables if any (currently none in Phase 2; skip if unused).
+      Each migration task must use exactly its reserved prefix. A task that discovers its slot has been consumed by an out-of-order landing must **stop and report**; it must not renumber another task's migration.
 
 ---
 
@@ -88,9 +101,9 @@ The `Allowed files` block is the exhaustive list of files an implementer may cre
 **Policy — what is always allowed on top of the literal `Allowed files` list:**
 
 1. **Task-local tests required by the task itself.** Every test file listed under the task's `Tests required` block is allowed, at the canonical locations:
-   - co-located unit / contract tests → `app/<module>/tests/test_<name>.py`
-   - API tests → `tests/api/test_<name>.py` (or `app/<module>/tests/test_api.py` when the task explicitly says so)
-   - integration tests (Testcontainers, DB, Redis, Arq, pgvector) → `tests/integration/test_<name>.py`
+    - co-located unit / contract tests → `app/<module>/tests/test_<name>.py`
+    - API tests → `tests/api/test_<name>.py` (or `app/<module>/tests/test_api.py` when the task explicitly says so)
+    - integration tests (Testcontainers, DB, Redis, Arq, pgvector) → `tests/integration/test_<name>.py`
 
    This applies whether `Allowed files` uses the shorthand `tests`, names the test file explicitly, or omits it entirely. If `Tests required` refers to a test that lives in a **different** task ("see T-XXX", "regression test in T-YYY"), do **not** create it under the current task — that test file belongs to the other task's `Allowed files`.
    **Test module basenames must be globally unique across the repository.** Because test directories under `app/<module>/tests/` and `tests/` are not packaged (no `__init__.py`) and pytest uses rootdir-based import, two files sharing a basename (e.g. `test_errors.py` in `app/api/tests/` and `app/shared/tests/`) produce an import collision at collection time. Prefer descriptive basenames scoped to the module under test (`test_error_handlers.py`, `test_shared_errors.py`, etc.). This applies only to test module filenames; do not change the layout, and do not add `__init__.py` markers to test directories to work around it.
