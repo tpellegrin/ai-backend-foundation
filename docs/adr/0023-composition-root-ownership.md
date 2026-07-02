@@ -23,6 +23,8 @@ A second, independent contradiction exists between T-504 and T-505: T-504's life
 3. **`lifespan` mutates the existing `Container` in place.**
    `app.core.lifespan` reads `app.state.container` (installed by the factory), runs `await on_startup(container)` hooks, and manages `app.state.ready`. It **must not** construct a new `Container` or `ProbeRegistry`, and **must not** reassign `app.state.container`. Later wiring tasks (T-701, T-702/T-708, T-1212, T-1402, T-1503) append their fields to the same `Container` instance and their probes to the same `ProbeRegistry` instance.
 
+   The **only** sanctioned mutation surface on the shared `ProbeRegistry` is `ProbeRegistry.add_probe(probe: Probe) -> None`, owned by T-405. All wiring tasks that add a probe must call this method against `container.probe_registry`; no subclassing, monkeypatching, or `__slots__`-bypass is permitted (including in tests). If T-405 shipped a registry without `add_probe`, that gap must be closed by a T-405 backfill commit **before** T-505 lands (see Follow-ups).
+
 4. **No `app.core → app.api` import exceptions.**
    The Layers contract in `importlinter.toml` remains untouched. Any future contradiction between a task spec and the layer contract must be reconciled at the spec level, not by weakening the contract.
 
@@ -54,6 +56,7 @@ A second, independent contradiction exists between T-504 and T-505: T-504's life
 ## Follow-ups
 
 - Amend T-504 (`docs/implementation/tasks/T-504.md`): remove `Container`/`ProbeRegistry` construction from `lifespan.py`.
-- Amend T-505 (`docs/implementation/tasks/T-505.md`): relocate allowed files to `app/main/app_factory.py` and `app/main/tests/test_app_factory.py`; state factory-owned `Container` construction explicitly.
+- Amend T-505 (`docs/implementation/tasks/T-505.md`): relocate allowed files to `app/main/app_factory.py` and `app/main/tests/test_app_factory.py` (no `__init__.py` under `app/main/tests/`, per `docs/implementation/rules.md` §4); state factory-owned `Container` construction explicitly; require the shared-registry test to exercise the real `ProbeRegistry.add_probe` API.
+- Amend T-405 (`docs/implementation/tasks/T-405.md`) and backfill `app/observability/health.py`: add the `ProbeRegistry.add_probe(probe: Probe) -> None` mutation primitive plus a unit test in `app/observability/tests/test_health.py`. This backfill lands as its own commit **before** any T-505 re-implementation commit, since T-505's shared-registry acceptance criterion (and every downstream wiring task T-701, T-702/T-708, T-1402, T-1503) depends on the primitive existing on the real class.
 - Update `docs/folder-structure.md` and `docs/dependency-graph.md` to reflect `app/main/` as a package and the composition-root split.
 - Update `IMPLEMENTATION_PLAN.md` T-505 row to point at the new path.
