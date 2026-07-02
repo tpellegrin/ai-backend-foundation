@@ -15,7 +15,7 @@ A clean dependency graph is what makes a codebase *navigable* in year three. We 
                     └──────────────┬─────────────────────────────┘
                                    │ imports
                     ┌──────────────▼─────────────────────────────┐
-        L4  comp.   │  app.core  (app_factory, container, di)    │
+        L4  comp.   │  app.core  (container, lifespan, di, wiring)│
                     └──────────────┬─────────────────────────────┘
                                    │
                     ┌──────────────▼─────────────────────────────┐
@@ -55,11 +55,17 @@ A clean dependency graph is what makes a codebase *navigable* in year three. We 
 | `app.documents`           | `app.shared`, `app.observability`, `app.embeddings` *(via port)*                                 |
 | `app.ai`                  | `app.shared`, `app.observability`, `app.llm`, `app.prompts`                                      |
 | `app.rag`                 | `app.shared`, `app.observability`, `app.llm`, `app.embeddings`, `app.prompts`, `app.documents`   |
-| `app.core`                | everything below it (this is the composition root and is **the only** place adapters are wired)  |
-| `app.api`                 | `app.core`, `app.shared`, `app.observability`, and each domain module's `api` submodule          |
-| `app.main`                | `app.core`, `app.api`                                                                            |
+| `app.core`                | everything below it (composition **library**; `app.core.wiring.*` is **the only** place adapters are wired) |
+| `app.api`                 | `app.core`, `app.shared`, `app.observability`, and each domain module's `api` submodule                     |
+| `app.main`                | `app.core`, `app.api` — composition **site** (`create_app()`); owns initial `Container`/`ProbeRegistry` construction (see [ADR-0023](adr/0023-composition-root-ownership.md)) |
 
 **Reading this table**: if an edge isn't listed, it isn't allowed.
+
+### Composition split (ADR-0023)
+
+- **Composition site** = `app.main`. `create_app()` lives in `app/main/app_factory.py`, imports both `app.core` and `app.api`, constructs the initial `Container` (with `settings` and an empty `ProbeRegistry`), and installs it on `app.state.container` before attaching the lifespan.
+- **Composition library** = `app.core`. Provides `container.py`, `lifespan.py`, `di.py`, and `wiring/*`. `app.core.lifespan` reads and mutates `app.state.container` in place; it never constructs a new `Container` or `ProbeRegistry`, and never reassigns `app.state.container`.
+- **Do not** add an `app.core → app.api` edge. The Layers contract in `importlinter.toml` is not to be weakened. If a task appears to require it, the task is wrong, not the contract.
 
 ### Important asymmetries
 

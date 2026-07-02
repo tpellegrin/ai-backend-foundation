@@ -48,14 +48,17 @@ ai-backend-boilerplate/
 
 ```
 app/
-├── main.py                     # ASGI entrypoint: builds the app from core.app_factory
+├── main/                       # composition **site** (per ADR-0023): builds the app and owns Container construction
+│   ├── __init__.py             # ASGI entrypoint: `app = create_app()` (T-506)
+│   ├── app_factory.py          # create_app(): constructs Container + empty ProbeRegistry, wires routers, middlewares, lifespan (T-505)
+│   └── tests/                  # test_app_factory.py: middleware order, CORS, readiness, container identity
 │
-├── core/                       # the composition root and the things only it gets to do
+├── core/                       # composition **library**: building blocks the site (`app.main`) composes
 │   ├── config/                 # Pydantic BaseSettings: AppSettings + per-concern settings
-│   ├── app_factory.py          # create_app(): wires routers, middlewares, lifespan
-│   ├── lifespan.py             # startup/shutdown: build container, open pools, close pools
-│   ├── container.py            # small dataclass holding singletons (db, redis, providers)
-│   └── di.py                   # FastAPI dependency providers that expose container pieces
+│   ├── lifespan.py             # startup/shutdown: reads app.state.container (installed by create_app) and mutates it in place
+│   ├── container.py            # small dataclass holding singletons (db, redis, providers); constructed by create_app in app.main
+│   ├── di.py                   # FastAPI dependency providers that expose container pieces
+│   └── wiring/                 # the only place allowed to import from app.infrastructure.*
 │
 ├── shared/                     # leaf utilities used by every module; depends on nothing in app/
 │   ├── errors.py               # base AppError hierarchy; mapped to Problem Details in api edge
@@ -188,7 +191,7 @@ app/
 ### Forbidden patterns
 
 - A top-level folder named `models/`, `schemas/`, `routers/`, `services/`, `utils/`, `common/`, or `helpers/`.
-- `from app.infrastructure.llm_providers.openai import ...` anywhere outside `app/core/` or `app/infrastructure/`.
+- `from app.infrastructure.llm_providers.openai import ...` anywhere outside `app/core/wiring/` or `app/infrastructure/`.
 - `from app.<module>.persistence import ...` outside `app/<module>/` and `alembic/`.
 - `import os; os.environ[...]` outside `app/core/config/`.
 - A SQLAlchemy `Session` or `AsyncSession` constructed anywhere outside `app/infrastructure/db/`.
