@@ -115,6 +115,13 @@ Reviewers must judge scope against the following, in this exact order:
 
 Everything else — helpers, shared fixtures, `conftest.py`, migrations, `.env.example` keys, docs, additional config keys — is out of scope unless the task lists the file by name. If the diff needs such a file to succeed, the correct verdict is **FAIL**: the task is under-scoped and must be revised, not silently patched.
 
+**Permanent exception — repository-wide `tests/conftest.py`.** The rootdir file `tests/conftest.py` is a permanent, structural fixture of the repository (see `rules.md` §1 *Repository-wide test env bootstrap* and §4). It exists to seed a minimal placeholder environment via `os.environ.setdefault(...)` so that pytest **collection** succeeds when a test file transitively imports `app.main` (which per ADR-0023 / T-506 eagerly calls `create_app()`). Reviewer duties around this file:
+
+- **Do not flag** a task for relying on `tests/conftest.py`. Its presence is guaranteed and its behavior is contractual.
+- **Do not flag** eager `create_app()` (or any other correct import-time `AppSettings` construction) as a test-hygiene or "collection-safety" defect. The repository-wide bootstrap handles this; per-file autouse `monkeypatch.setenv` fixtures do not (they run at test-execution time, not collection time). This is the intended design.
+- **Do flag** any diff that: (a) adds shared fixtures, factories, fakes, mocks, or `app.*` imports to `tests/conftest.py`; (b) uses it as a place to hide test-scope logic; (c) removes or restructures it; (d) modifies it *without* the current task also introducing a new **required** `AppSettings` field and listing `tests/conftest.py` in its `Allowed files`. Any such change is a **BLOCKING** scope violation.
+- **Do flag** any test file that duplicates `tests/conftest.py`'s bootstrap (e.g., calling `os.environ[...] = ...` in a test module, `subprocess`-ing a fresh Python interpreter with a hand-rolled env dict, or `importlib.reload(app.main)` to work around an env-timing bug that no longer exists). These are `rules.md` §3 rule 8 / §3 rule 14 violations, not legitimate workarounds.
+
 **Reviewer patch authority reminder.** Reviewer patches under `docs/ai/review-task.md` are still bounded by the current task's `Allowed files` **and** the three bullets above; they do not extend scope. A reviewer must not add a support file to close a minor finding.
 
 **Current-codebase review.** Ground every judgment in the actual repository state at the time of the diff. Do not reject on the basis of a future task's expected outcome, and do not accept a change that anticipates a future task by pulling files in early.
