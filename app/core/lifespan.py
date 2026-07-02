@@ -3,42 +3,32 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.core.config.settings import get_settings
 from app.core.container import Container
-from app.observability.health import ProbeRegistry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage application lifecycle and dependency container.
 
-    Initializes the container, runs startup hooks, and sets the readiness flag.
+    Runs startup hooks and manages the readiness flag. The Container
+    is pre-constructed and installed on app.state.container by the factory.
     """
-    # 1. Bootstrap
-    settings = get_settings()
-    # T-504: Probe registry is bootstrapped empty here.
-    probe_registry = ProbeRegistry([])
+    # 1. Read pre-constructed container
+    container: Container = app.state.container
 
-    # 2. Initialize Container
-    container = Container(
-        settings=settings,
-        probe_registry=probe_registry,
-    )
-
-    # 3. Store on app state
-    app.state.container = container
+    # 2. Initial state: not ready
     app.state.ready = False
 
-    # 4. Startup hooks
+    # 3. Startup hooks
     await _on_startup(container)
 
-    # Flip readiness flag only after success
+    # 4. Success -> ready
     app.state.ready = True
 
     try:
         yield
     finally:
-        # Flip back on shutdown
+        # 5. Shutdown -> not ready
         app.state.ready = False
         await _on_shutdown(container)
 

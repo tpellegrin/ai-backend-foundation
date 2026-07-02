@@ -1,12 +1,19 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI, Response, status
 from httpx import ASGITransport, AsyncClient
 
+from app.core.config.settings import get_settings as bootstrap_settings
+from app.core.container import Container
 from app.core.di import get_container, get_probe_registry, get_settings
 from app.core.lifespan import lifespan
-from app.observability.health import ProbeRegistry, build_health_router
+from app.observability.health import (
+    Probe,
+    ProbeRegistry,
+    ProbeResult,
+    build_health_router,
+)
 
 
 @pytest.fixture
@@ -36,29 +43,39 @@ async def test_lifespan_lifecycle(valid_env_vars: None) -> None:
     """Test that the lifespan correctly manages the container and readiness flag.
 
     Verifies:
-    - Container is populated on startup.
-    - Probe registry is initially empty.
-    - app.state.ready flips from False to True and back to False.
-    - /readyz returns 503 before startup and 200 after.
+    - Container identity is preserved (pre-constructed).
+    - Readiness transitions from False -> True -> False.
+    - Health router correctly uses the container's probe registry.
+    - Probes added before startup are visible after startup.
     """
+    # 1. Setup pre-constructed container (mirroring app factory)
+    settings = bootstrap_settings()
+    registry = ProbeRegistry([])
+    container = Container(settings=settings, probe_registry=registry)
+
     app = FastAPI(lifespan=lifespan)
+    app.state.container = container
+    app.state.ready = False
 
-    # Use a proxy for the registry since it's created during lifespan
-    class RegistryProxy:
-        async def run_all(self) -> list:
-            if not hasattr(app.state, "container"):
-                return []
-            return list(await app.state.container.probe_registry.run_all())
-
-    # Wire health router against app state
+    # 2. Wire health router using Container's ProbeRegistry
     router = build_health_router(
-        registry=RegistryProxy(),  # type: ignore[arg-type] # RegistryProxy implements subset of ProbeRegistry required for test
+        registry=container.probe_registry,
         is_ready=lambda: getattr(app.state, "ready", False),
     )
     app.include_router(router)
 
-    # 1. Before startup: /readyz returns 503
-    # We test the handler directly because AsyncClient would trigger startup.
+    # 3. Add a probe before startup
+    mock_probe = MagicMock(spec=Probe)
+    mock_probe.name = "test_probe"
+    mock_probe.check = AsyncMock(return_value=ProbeResult(name="test_probe", status="ok"))
+    # Append to the registry instance (must not replace registry instance)
+    container.probe_registry._probes += (mock_probe,)  # type: ignore[attr-defined]
+
+    # 4. Verify identity and initial state
+    assert app.state.container is container
+    assert app.state.ready is False
+
+    # Check /readyz before startup (503)
     readyz_route = next(r for r in router.routes if r.path == "/readyz")
     handler = readyz_route.endpoint
     response = Response()
@@ -66,34 +83,36 @@ async def test_lifespan_lifecycle(valid_env_vars: None) -> None:
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert res == {"status": "starting"}
 
-    # 2. During/After startup
+    # 5. Execute lifespan
     async with lifespan(app):
-        # After startup completed
+        # Verify identity preserved during startup
+        assert app.state.container is container
         assert app.state.ready is True
-        assert hasattr(app.state, "container")
-        assert app.state.container.settings is not None
-        assert isinstance(app.state.container.probe_registry, ProbeRegistry)
-        assert len(app.state.container.probe_registry.probes) == 0
+
+        # Verify probe is visible and /readyz is 200
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/readyz")
+            assert resp.status_code == status.HTTP_200_OK
+            assert resp.json() == {"status": "ok"}
+            mock_probe.check.assert_called()
+
+            # Verify /healthz is also 200
+            resp_health = await client.get("/healthz")
+            assert resp_health.status_code == status.HTTP_200_OK
 
         # Verify dependency providers in di.py
         mock_request = MagicMock()
         mock_request.app = app
-        container = get_container(mock_request)
-        assert container == app.state.container
-        assert get_settings(container) == container.settings
-        assert get_probe_registry(container) == container.probe_registry
+        injected_container = get_container(mock_request)
+        assert injected_container is container
+        assert get_settings(injected_container) is container.settings
+        assert get_probe_registry(injected_container) is container.probe_registry
 
-        # Now we can use AsyncClient to test endpoints
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Verify /readyz is 200
-            response_api = await client.get("/readyz")
-            assert response_api.status_code == status.HTTP_200_OK
-            assert response_api.json() == {"status": "ok"}
-
-            # Verify /healthz is 200
-            response_api = await client.get("/healthz")
-            assert response_api.status_code == status.HTTP_200_OK
-            assert response_api.json() == {"status": "ok"}
-
-    # 3. After shutdown
+    # 6. After shutdown
+    assert app.state.container is container
     assert app.state.ready is False
+
+    # Verify /readyz is 503 again
+    response = Response()
+    res = await handler(response)
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
