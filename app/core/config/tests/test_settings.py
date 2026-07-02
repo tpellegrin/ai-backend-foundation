@@ -1,4 +1,4 @@
-# ruff: noqa: S101
+# ruff: noqa: S101, PLR2004
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -93,6 +93,151 @@ def test_get_settings_caching(valid_env_vars: dict[str, str]) -> None:
     s1 = get_settings()
     s2 = get_settings()
     assert s1 is s2
+
+
+@pytest.mark.unit
+def test_http_defaults(valid_env_vars: dict[str, str]) -> None:
+    get_settings.cache_clear()
+    settings = AppSettings()
+    assert settings.http.connect_timeout_s == 5.0
+    assert settings.http.read_timeout_s == 30.0
+    assert settings.http.total_timeout_s == 60.0
+    assert settings.http.retry_max_attempts == 3
+    assert settings.http.retry_backoff_factor == 0.5
+
+
+@pytest.mark.unit
+def test_http_env_parsing(valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HTTP_CONNECT_TIMEOUT_S", "2.5")
+    monkeypatch.setenv("HTTP_READ_TIMEOUT_S", "10.0")
+    monkeypatch.setenv("HTTP_TOTAL_TIMEOUT_S", "15.0")
+    monkeypatch.setenv("HTTP_RETRY_MAX_ATTEMPTS", "5")
+    monkeypatch.setenv("HTTP_RETRY_BACKOFF_FACTOR", "1.5")
+    settings = AppSettings()
+    assert settings.http.connect_timeout_s == 2.5
+    assert settings.http.read_timeout_s == 10.0
+    assert settings.http.total_timeout_s == 15.0
+    assert settings.http.retry_max_attempts == 5
+    assert settings.http.retry_backoff_factor == 1.5
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "env_var",
+    [
+        "HTTP_CONNECT_TIMEOUT_S",
+        "HTTP_READ_TIMEOUT_S",
+        "HTTP_TOTAL_TIMEOUT_S",
+        "HTTP_RETRY_BACKOFF_FACTOR",
+    ],
+)
+@pytest.mark.parametrize("bad_value", ["0", "-1", "-0.5"])
+def test_http_positive_floats_reject_zero_and_negative(
+    valid_env_vars: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    env_var: str,
+    bad_value: str,
+) -> None:
+    monkeypatch.setenv(env_var, bad_value)
+    with pytest.raises(ValidationError):
+        AppSettings()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("bad_value", ["0", "-1"])
+def test_http_retry_max_attempts_min_one(
+    valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch, bad_value: str
+) -> None:
+    monkeypatch.setenv("HTTP_RETRY_MAX_ATTEMPTS", bad_value)
+    with pytest.raises(ValidationError):
+        AppSettings()
+
+
+@pytest.mark.unit
+def test_arq_defaults(valid_env_vars: dict[str, str]) -> None:
+    get_settings.cache_clear()
+    settings = AppSettings()
+    assert settings.arq.queue_name == "default"
+    assert settings.arq.max_jobs == 10
+    assert settings.arq.job_timeout_s == 300
+    assert settings.arq.keep_result_s == 3600
+
+
+@pytest.mark.unit
+def test_arq_env_parsing(valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARQ_QUEUE_NAME", "docs")
+    monkeypatch.setenv("ARQ_MAX_JOBS", "25")
+    monkeypatch.setenv("ARQ_JOB_TIMEOUT_S", "120")
+    monkeypatch.setenv("ARQ_KEEP_RESULT_S", "0")
+    settings = AppSettings()
+    assert settings.arq.queue_name == "docs"
+    assert settings.arq.max_jobs == 25
+    assert settings.arq.job_timeout_s == 120
+    assert settings.arq.keep_result_s == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("env_var", "bad_value"),
+    [
+        ("ARQ_MAX_JOBS", "0"),
+        ("ARQ_MAX_JOBS", "-1"),
+        ("ARQ_JOB_TIMEOUT_S", "0"),
+        ("ARQ_JOB_TIMEOUT_S", "-1"),
+        ("ARQ_KEEP_RESULT_S", "-1"),
+    ],
+)
+def test_arq_rejects_bad_values(
+    valid_env_vars: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    env_var: str,
+    bad_value: str,
+) -> None:
+    monkeypatch.setenv(env_var, bad_value)
+    with pytest.raises(ValidationError):
+        AppSettings()
+
+
+@pytest.mark.unit
+def test_api_defaults_deny_by_default(valid_env_vars: dict[str, str]) -> None:
+    get_settings.cache_clear()
+    settings = AppSettings()
+    assert settings.api.cors_allowed_origins == ()
+    assert settings.api.cors_allow_credentials is False
+    assert settings.api.cors_allowed_methods == ("GET", "POST")
+    assert settings.api.cors_allowed_headers == (
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+    )
+    assert settings.api.security_headers_enabled is True
+
+
+@pytest.mark.unit
+def test_api_cors_allowed_origins_parses_csv(
+    valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("API_CORS_ALLOWED_ORIGINS", "https://a.example.com, https://b.example.com")
+    settings = AppSettings()
+    assert settings.api.cors_allowed_origins == (
+        "https://a.example.com",
+        "https://b.example.com",
+    )
+
+
+@pytest.mark.unit
+def test_api_cors_methods_and_headers_env(
+    valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("API_CORS_ALLOWED_METHODS", "GET,POST,PUT")
+    monkeypatch.setenv("API_CORS_ALLOWED_HEADERS", "Authorization,X-Custom")
+    monkeypatch.setenv("API_CORS_ALLOW_CREDENTIALS", "true")
+    monkeypatch.setenv("API_SECURITY_HEADERS_ENABLED", "false")
+    settings = AppSettings()
+    assert settings.api.cors_allowed_methods == ("GET", "POST", "PUT")
+    assert settings.api.cors_allowed_headers == ("Authorization", "X-Custom")
+    assert settings.api.cors_allow_credentials is True
+    assert settings.api.security_headers_enabled is False
 
 
 @pytest.mark.unit

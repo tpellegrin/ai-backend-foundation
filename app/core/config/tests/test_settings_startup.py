@@ -59,3 +59,27 @@ def test_settings_fails_on_missing_var(
     # Pydantic errors can use the alias or the field name.
     # We check for the alias (which is the env var name) in the error string.
     assert missing_var.lower() in str(excinfo.value).lower()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("env_var", "bad_value"),
+    [
+        ("HTTP_CONNECT_TIMEOUT_S", "0"),
+        ("HTTP_READ_TIMEOUT_S", "0"),
+        ("HTTP_TOTAL_TIMEOUT_S", "0"),
+        ("HTTP_RETRY_BACKOFF_FACTOR", "0"),
+        ("HTTP_RETRY_MAX_ATTEMPTS", "0"),
+        ("ARQ_MAX_JOBS", "0"),
+        ("ARQ_JOB_TIMEOUT_S", "0"),
+        ("ARQ_KEEP_RESULT_S", "-1"),
+    ],
+)
+def test_settings_startup_fails_on_bad_numeric_config(
+    valid_env: None, monkeypatch: pytest.MonkeyPatch, env_var: str, bad_value: str
+) -> None:
+    """App refuses to start when Http/Arq numeric bounds are violated."""
+    get_settings.cache_clear()
+    monkeypatch.setenv(env_var, bad_value)
+    with pytest.raises(ValidationError):
+        AppSettings()

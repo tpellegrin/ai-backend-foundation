@@ -69,6 +69,99 @@ class OpenAI(BaseSettings):
     )
 
 
+class Http(BaseSettings):
+    connect_timeout_s: float = Field(
+        default=5.0,
+        gt=0,
+        validation_alias=AliasChoices("HTTP_CONNECT_TIMEOUT_S", "http__connect_timeout_s"),
+    )
+    read_timeout_s: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias=AliasChoices("HTTP_READ_TIMEOUT_S", "http__read_timeout_s"),
+    )
+    total_timeout_s: float = Field(
+        default=60.0,
+        gt=0,
+        validation_alias=AliasChoices("HTTP_TOTAL_TIMEOUT_S", "http__total_timeout_s"),
+    )
+    retry_max_attempts: int = Field(
+        default=3,
+        ge=1,
+        validation_alias=AliasChoices("HTTP_RETRY_MAX_ATTEMPTS", "http__retry_max_attempts"),
+    )
+    retry_backoff_factor: float = Field(
+        default=0.5,
+        gt=0,
+        validation_alias=AliasChoices("HTTP_RETRY_BACKOFF_FACTOR", "http__retry_backoff_factor"),
+    )
+
+
+class Arq(BaseSettings):
+    queue_name: str = Field(
+        default="default",
+        validation_alias=AliasChoices("ARQ_QUEUE_NAME", "arq__queue_name"),
+    )
+    max_jobs: int = Field(
+        default=10,
+        ge=1,
+        validation_alias=AliasChoices("ARQ_MAX_JOBS", "arq__max_jobs"),
+    )
+    job_timeout_s: int = Field(
+        default=300,
+        ge=1,
+        validation_alias=AliasChoices("ARQ_JOB_TIMEOUT_S", "arq__job_timeout_s"),
+    )
+    keep_result_s: int = Field(
+        default=3600,
+        ge=0,
+        validation_alias=AliasChoices("ARQ_KEEP_RESULT_S", "arq__keep_result_s"),
+    )
+
+
+def _parse_csv_tuple(v: object) -> tuple[str, ...]:
+    if isinstance(v, str):
+        return tuple(s.strip() for s in v.split(",") if s.strip())
+    if isinstance(v, (list, tuple)):
+        return tuple(v)
+    return cast(tuple[str, ...], v)
+
+
+class Api(BaseSettings):
+    cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=(),
+        validation_alias=AliasChoices("API_CORS_ALLOWED_ORIGINS", "api__cors_allowed_origins"),
+    )
+    cors_allow_credentials: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("API_CORS_ALLOW_CREDENTIALS", "api__cors_allow_credentials"),
+    )
+    cors_allowed_methods: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=("GET", "POST"),
+        validation_alias=AliasChoices("API_CORS_ALLOWED_METHODS", "api__cors_allowed_methods"),
+    )
+    cors_allowed_headers: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=("Authorization", "Content-Type", "X-Request-ID"),
+        validation_alias=AliasChoices("API_CORS_ALLOWED_HEADERS", "api__cors_allowed_headers"),
+    )
+    security_headers_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "API_SECURITY_HEADERS_ENABLED", "api__security_headers_enabled"
+        ),
+    )
+
+    @field_validator(
+        "cors_allowed_origins",
+        "cors_allowed_methods",
+        "cors_allowed_headers",
+        mode="before",
+    )
+    @classmethod
+    def _split_csv(cls, v: object) -> tuple[str, ...]:
+        return _parse_csv_tuple(v)
+
+
 class BlobStorage(BaseSettings):
     backend: Literal["local"] = Field(
         default="local", validation_alias=AliasChoices("BLOB_STORAGE_BACKEND", "blob__backend")
@@ -122,6 +215,9 @@ class AppSettings(BaseSettings):
     blob: BlobStorage = Field(default_factory=BlobStorage)
     otel: Otel = Field(default_factory=Otel)
     governance: Governance = Field(default_factory=Governance)
+    http: Http = Field(default_factory=Http)
+    arq: Arq = Field(default_factory=Arq)
+    api: Api = Field(default_factory=Api)
 
 
 @lru_cache(maxsize=1)
