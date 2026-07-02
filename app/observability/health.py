@@ -33,7 +33,7 @@ class Probe(Protocol):
 
 
 class ProbeRegistry:
-    """Immutable, pure container that composes zero or more probes.
+    """Pure container that composes zero or more probes.
 
     The registry itself performs no I/O and holds no global state; it only
     fans out to the probes it was constructed with, in deterministic order.
@@ -42,11 +42,15 @@ class ProbeRegistry:
     __slots__ = ("_probes",)
 
     def __init__(self, probes: Iterable[Probe] = ()) -> None:
-        self._probes: tuple[Probe, ...] = tuple(probes)
+        self._probes: list[Probe] = list(probes)
 
     @property
     def probes(self) -> tuple[Probe, ...]:
-        return self._probes
+        return tuple(self._probes)
+
+    def add_probe(self, probe: Probe) -> None:
+        """Append a probe to the registry in registration order."""
+        self._probes.append(probe)
 
     async def run_all(self) -> Sequence[ProbeResult]:
         """Run all probes in registration order and return their results."""

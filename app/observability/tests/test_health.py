@@ -146,3 +146,42 @@ def test_registry_evaluates_probes_in_registration_order() -> None:
     results = asyncio.run(registry.run_all())
     assert [r.name for r in results] == ["a", "b", "c"]
     assert order == ["a", "b", "c"]
+
+
+@pytest.mark.unit
+def test_add_probe_mutation_is_visible_to_registry() -> None:
+    registry = ProbeRegistry()
+    p1 = MockProbe("p1")
+    p2 = MockProbe("p2")
+
+    registry.add_probe(p1)
+    registry.add_probe(p2)
+
+    assert registry.probes == (p1, p2)
+    results = asyncio.run(registry.run_all())
+    assert [r.name for r in results] == ["p1", "p2"]
+    assert p1.called
+    assert p2.called
+
+
+@pytest.mark.unit
+def test_add_probe_mutation_is_visible_to_endpoints() -> None:
+    registry = ProbeRegistry()
+    client = _client(registry)
+
+    # Initially ok (no probes)
+    assert client.get("/healthz").status_code == status.HTTP_200_OK
+
+    # Add a failing probe
+    registry.add_probe(MockProbe("fail", result_status="error"))
+
+    # Now 503
+    response = client.get("/healthz")
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json()["probes"] == {"fail": "error"}
+
+    # Add a passing probe
+    registry.add_probe(MockProbe("ok"))
+    response = client.get("/healthz")
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json()["probes"] == {"fail": "error", "ok": "ok"}
