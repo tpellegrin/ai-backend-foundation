@@ -118,7 +118,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 
 ## S11 — LLM + embeddings ports
 
-- [ ] **T-1100** — `app/ai_governance/{domain,ports}.py` (pre-llm interface only) — Ship governance domain + `GovernanceGate` protocol before `llm.service` needs to type it.
+- [ ] **T-1100** — `app/ai_governance/{domain,ports}.py` (pre-llm interface only) — Ship governance domain types (`BudgetPolicy`, `UsageEntry`) and outbound persistence ports (`UsageRepository`, `BudgetPolicyStore`) so S12 can implement the service against a stable contract. The `GovernanceGate` Protocol lives in `app.llm.ports` (T-1101) per ADR-0024; `app.llm` does not import `app.ai_governance`.
 - [ ] **T-1101** — `app/llm/{domain,ports,observability,router}.py` — Chat domain types, `ChatModel` protocol, observation record, and `ModelRouter`.
 - [ ] **T-1102** — `app/llm/service.py` — `LlmService` that consults `GovernanceGate` and emits `LLMCallObservation` around every provider call.
 - [ ] **T-1103** — `app/embeddings/{domain,ports,service}.py` — Embedding domain, `EmbeddingModel` port, and `EmbeddingsService`.

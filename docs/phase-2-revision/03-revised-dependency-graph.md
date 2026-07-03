@@ -59,7 +59,7 @@
 | `app.observability`        | `app.shared`                                                                                          |
 | `app.infrastructure.*`     | `app.shared`, `app.observability`, `app.platform.*` (to *implement* the ports)                        |
 | `app.platform.*`           | `app.shared`                                                                                          |
-| `app.llm`                  | `app.shared`, `app.observability`, `app.platform.*`, `app.ai_governance.ports`                        |
+| `app.llm`                  | `app.shared`, `app.observability`, `app.platform.*` *(owns `GovernanceGate` in `app.llm.ports`; does **not** import `app.ai_governance` — see ADR-0024)* |
 | `app.embeddings`           | `app.shared`, `app.observability`, `app.platform.*`                                                   |
 | `app.prompts`              | `app.shared`, `app.observability`, `app.platform.storage` *(optional, for DB-backed overrides)*       |
 | `app.auth`                 | `app.shared`, `app.observability`, `app.platform.cache` *(token/blacklist)*                            |
@@ -81,7 +81,7 @@ If an edge is not listed, it is forbidden.
 - `app.auth` does not depend on `app.users` (only the reverse, and only on domain types).
 - `app.documents` depends on `app.embeddings` *port* and on `app.platform.queue` (for the ingestion job), never on Arq directly.
 - `app.rag` depends on `app.documents` for `(document_id, chunk_id)` provenance types only (read-only domain types; no persistence).
-- Every consumer of `app.llm` may also import `app.ai_governance.ports` to type the budget check; the *adapter* is wired by `app.core`.
+- `app.llm` **does not** import `app.ai_governance`. `LlmService` types its governance dependency against `app.llm.ports.GovernanceGate` (see ADR-0024); the concrete implementation is `app.ai_governance.service.GovernanceService`, wired in `app.core.wiring.llm`. Domain-layer consumers of governance (e.g. `app.ai`, `app.rag`) may import `app.ai_governance.ports` directly — same-layer L4, already listed above.
 
 ---
 
@@ -104,6 +104,7 @@ If an edge is not listed, it is forbidden.
 | Port               | Defined in                          | Consumed by                                          | Adapter location                          |
 | ------------------ | ----------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
 | `ChatModel`        | `app.llm.ports`                     | `app.ai`, `app.rag`, `app.llm.service`               | `app.infrastructure.llm_providers.*`      |
+| `GovernanceGate`   | `app.llm.ports`                     | `app.llm.service`                                    | `app.ai_governance.service` (structural; wired in `app.core.wiring.llm` — ADR-0024) |
 | `ModelRouter`      | `app.llm.ports`                     | `app.ai`, `app.rag`                                  | `app.llm.router` (default)                |
 | `EmbeddingModel`   | `app.embeddings.ports`              | `app.rag`, `app.documents`                           | `app.infrastructure.embedding_providers.*`|
 | `VectorStore`      | `app.rag.ports`                     | `app.rag`                                            | `app.infrastructure.vector_stores.*`      |
