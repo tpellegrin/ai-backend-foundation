@@ -1,5 +1,13 @@
 # Module Dependency Graph
 
+> **Superseded by** [`phase-2-revision/03-revised-dependency-graph.md`](phase-2-revision/03-revised-dependency-graph.md).
+>
+> This document predates the Phase 2 revision pack and is retained for historical
+> reference only. It does not model `app.platform` as its own layer and its
+> allowed-edge table is out of date. For the authoritative dependency graph (and
+> the one mirrored by `.importlinter`), read the revised graph linked above.
+> New contributors: follow the revised graph; do not add rules here.
+
 > The dependency graph is part of the architecture. It will be enforced mechanically (see [ADR-0011](adr/0011-enforce-module-boundaries-with-import-linter.md)).
 
 A clean dependency graph is what makes a codebase *navigable* in year three. We define it explicitly here; CI rejects PRs that violate it.

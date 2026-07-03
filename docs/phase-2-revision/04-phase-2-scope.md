@@ -21,7 +21,7 @@
 
 ## 2. App foundation (`app/`)
 
-- `app/main.py` — ASGI entrypoint calling `core.app_factory.create_app()`.
+- `app/main/` — composition site and ASGI entrypoint **package** (`app/main/app_factory.py::create_app()`); no top-level `app/main.py` module.
 - `app/core/` — `config/` (Pydantic Settings, env-driven, fails fast); `app_factory.py`; `lifespan.py`; `container.py`; `di.py`; `wiring/{llm,embeddings,vector_store,storage,cache,queue,governance}.py`.
 - `app/shared/` — full (errors, problem_details, pagination, ids, clock, result, types, pydantic base).
 - `app/observability/` — structlog config; OTel tracer/meter setup (exporters constructed in `core.wiring` and registered here); correlation middleware (`X-Request-ID` in/out); access log middleware; exception → Problem Details handler; `/healthz`, `/readyz`, `/livez`, optional `/metrics`.
@@ -36,8 +36,7 @@
 | `infrastructure/db/`                         | async engine, sessionmaker, base metadata, pgvector type, session-per-request |
 | `infrastructure/redis/`                      | async client + `Cache` adapter                                                |
 | `infrastructure/http/`                       | shared httpx client; tenacity retries; OTel instrumentation; timeouts         |
-| `infrastructure/storage/local.py`            | `BlobStorage` local-FS adapter (dev)                                          |
-| `infrastructure/storage/s3.py`               | `BlobStorage` S3 adapter via `aioboto3`                                       |
+| `infrastructure/storage/local.py`            | `BlobStorage` local-FS adapter (dev). S3 adapter is deferred to Phase 3 (roadmap T-705). |
 | `infrastructure/queue/arq.py`                | `TaskQueue` Arq adapter; worker entrypoint                                    |
 | `infrastructure/rate_limit/redis.py`         | Redis token-bucket adapter                                                    |
 | `infrastructure/idempotency/redis.py`        | Redis-backed `IdempotencyStore`                                               |
@@ -45,7 +44,7 @@
 | `infrastructure/embedding_providers/openai.py` | only OpenAI in Phase 2                                                      |
 | `infrastructure/vector_stores/pgvector.py`   | pgvector adapter; hybrid (BM25 + vector) deferred                             |
 
-Other providers (Anthropic, Gemini, Voyage, Cohere, Qdrant) are Phase 3.
+Other providers (Anthropic, Gemini, Voyage, Cohere, Qdrant) are Phase 3. The `BlobStorage` S3 adapter (`infrastructure/storage/s3.py`) is also Phase 3; the `BlobStorage` port itself ships in Phase 2 so a future S3 adapter can be added behind it without a port change.
 
 ## 4. Domain modules (Phase 2 materialization)
 

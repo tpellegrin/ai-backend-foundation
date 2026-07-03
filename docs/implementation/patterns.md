@@ -132,6 +132,18 @@
   docstring of `test_http_exception_is_not_normalized_to_problem_details`
   (points at AGENTS.md §12).
 
+### P-13. Globally-unique test-file basenames for port tests
+- **Rule.** Port test files under `app/platform/<module>/tests/` (and any
+  other cross-module port location) use `test_<module>_ports.py` rather
+  than the generic `test_ports.py`. pytest resolves test modules by
+  basename; two files named `test_ports.py` in sibling packages cause an
+  `import file mismatch` error the first time both packages are collected
+  in the same session. Applies to future ports too, not just the current
+  `platform/*` set.
+- **Examples.** `test_storage_ports.py`, `test_cache_ports.py`,
+  `test_queue_ports.py`, `test_rate_limit_ports.py`, `test_idempotency_ports.py`.
+- **Anti-pattern displaced.** AP-10 (generic `test_ports.py` in every module).
+
 ---
 
 ## Anti-patterns to avoid
@@ -159,6 +171,9 @@ Anti-patterns reviewers should reject. Each has previously caused a review findi
   `structlog` with `exc_info` and mark the OTel span errored. See AGENTS.md §12.
 - **AP-9.** Assertions that only check the happy shape and never assert the
   *absence* of leaked internals. Displaced by **P-11**.
+- **AP-10.** Generic `test_ports.py` basenames in sibling port packages under
+  `app/platform/*/tests/`. Causes pytest `import file mismatch` when two
+  such files are collected together. Displaced by **P-13**.
 
 ---
 
