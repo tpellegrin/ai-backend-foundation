@@ -17,7 +17,12 @@ from app.observability.correlation import CorrelationMiddleware, request_id_var
 @pytest.mark.unit
 def test_correlation_middleware_echoes_id() -> None:
     async def endpoint(request: Request) -> Response:
-        return JSONResponse({"id_in_var": request_id_var.get()})
+        return JSONResponse(
+            {
+                "id_in_var": request_id_var.get(),
+                "id_in_state": getattr(request.state, "request_id", ""),
+            }
+        )
 
     app = Starlette(routes=[Route("/", endpoint)])
     app.add_middleware(CorrelationMiddleware)
@@ -28,7 +33,42 @@ def test_correlation_middleware_echoes_id() -> None:
 
     assert response.status_code == status.HTTP_200_OK
     assert response.headers["X-Request-ID"] == request_id
-    assert response.json()["id_in_var"] == request_id
+    body = response.json()
+    assert body["id_in_var"] == request_id
+    # The id must also live on scope-backed request.state so that Starlette's
+    # ServerErrorMiddleware — which wraps this middleware — can recover it
+    # when handling sanitized 500 responses.
+    assert body["id_in_state"] == request_id
+
+
+@pytest.mark.unit
+def test_correlation_middleware_persists_state_across_exception() -> None:
+    """CorrelationMiddleware must expose the request id on ``request.state``
+    even when the downstream endpoint raises. ``request.state`` is backed by
+    ``scope["state"]``, so an ``Exception`` handler running in
+    ``ServerErrorMiddleware`` (outside this middleware) can still read it
+    after our contextvar has been reset in the ``finally`` block."""
+
+    seen: dict[str, str] = {}
+
+    async def boom(request: Request) -> Response:  # pragma: no cover - not reached fully
+        # Snapshot the state that the outer error handler will see.
+        seen["state"] = getattr(request.state, "request_id", "")
+        seen["ctx"] = request_id_var.get()
+        raise RuntimeError("kaboom")
+
+    app = Starlette(routes=[Route("/boom", boom)])
+    app.add_middleware(CorrelationMiddleware)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    request_id = str(uuid.uuid4())
+    response = client.get("/boom", headers={"X-Request-ID": request_id})
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert seen["state"] == request_id
+    assert seen["ctx"] == request_id
+    # The contextvar must have been reset once the middleware unwound.
+    assert request_id_var.get() == ""
 
 
 @pytest.mark.unit

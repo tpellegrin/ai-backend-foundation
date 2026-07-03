@@ -1,4 +1,6 @@
 # ruff: noqa: S101, PLR2004
+import uuid
+
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -6,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.api.errors import register_exception_handlers
 from app.observability import request_id_var
+from app.observability.correlation import CorrelationMiddleware
 from app.shared.errors import AppError
 
 
@@ -142,3 +145,123 @@ def test_unhandled_error_mapping(client: TestClient) -> None:
         assert "Traceback" not in body
     finally:
         request_id_var.reset(token)
+
+
+# --- Integration with CorrelationMiddleware -----------------------------------
+#
+# The fallback ``Exception`` handler is invoked by Starlette's
+# ``ServerErrorMiddleware``, which wraps user middleware. That means it runs
+# *outside* ``CorrelationMiddleware``'s contextvar scope: by the time the
+# handler executes, ``request_id_var`` has already been reset in the
+# middleware's ``finally`` block. These tests exercise the real middleware +
+# handler stack to prove the sanitized 500 response still carries
+# ``X-Request-ID`` (recovered from ``request.state.request_id``).
+
+
+@pytest.fixture
+def app_with_correlation() -> FastAPI:
+    app = FastAPI()
+    app.add_middleware(CorrelationMiddleware)
+    register_exception_handlers(app)
+
+    @app.get("/unhandled-error")
+    async def raise_unhandled_error() -> None:
+        raise ValueError("secret-stacktrace-marker-should-not-leak")
+
+    @app.get("/app-error")
+    async def raise_app_error() -> None:
+        raise MockAppError()
+
+    @app.get("/validation-error")
+    async def raise_validation_error() -> None:
+        raise RequestValidationError(
+            errors=[
+                {"loc": ("body", "name"), "msg": "field required", "type": "value_error.missing"}
+            ]
+        )
+
+    return app
+
+
+@pytest.fixture
+def correlated_client(app_with_correlation: FastAPI) -> TestClient:
+    return TestClient(app_with_correlation, raise_server_exceptions=False)
+
+
+@pytest.mark.api
+def test_sanitized_500_echoes_inbound_request_id(correlated_client: TestClient) -> None:
+    inbound = str(uuid.uuid4())
+    response = correlated_client.get("/unhandled-error", headers={"X-Request-ID": inbound})
+
+    assert response.status_code == 500
+    assert response.headers["Content-Type"] == "application/problem+json"
+    # The critical assertion: the sanitized 500 response carries X-Request-ID.
+    assert response.headers["X-Request-ID"] == inbound
+
+    data = response.json()
+    assert data["code"] == "internal-error"
+    assert data["request_id"] == inbound
+
+    # And it must still be sanitized.
+    body = response.text
+    assert "secret-stacktrace-marker-should-not-leak" not in body
+    assert "ValueError" not in body
+    assert "Traceback" not in body
+
+
+@pytest.mark.api
+def test_sanitized_500_generates_request_id_when_absent(correlated_client: TestClient) -> None:
+    response = correlated_client.get("/unhandled-error")
+
+    assert response.status_code == 500
+    assert "X-Request-ID" in response.headers
+    generated = response.headers["X-Request-ID"]
+    # Must be a valid UUID and match the body.
+    uuid.UUID(generated)
+    assert response.json()["request_id"] == generated
+
+
+@pytest.mark.api
+def test_sanitized_500_replaces_malformed_request_id(correlated_client: TestClient) -> None:
+    response = correlated_client.get("/unhandled-error", headers={"X-Request-ID": "not-a-uuid"})
+
+    assert response.status_code == 500
+    assert "X-Request-ID" in response.headers
+    emitted = response.headers["X-Request-ID"]
+    assert emitted != "not-a-uuid"
+    uuid.UUID(emitted)
+    assert response.json()["request_id"] == emitted
+
+
+@pytest.mark.api
+def test_app_error_through_middleware_echoes_request_id(correlated_client: TestClient) -> None:
+    inbound = str(uuid.uuid4())
+    response = correlated_client.get("/app-error", headers={"X-Request-ID": inbound})
+
+    assert response.status_code == 400
+    assert response.headers["X-Request-ID"] == inbound
+    assert response.json()["request_id"] == inbound
+
+
+@pytest.mark.api
+def test_validation_error_through_middleware_echoes_request_id(
+    correlated_client: TestClient,
+) -> None:
+    inbound = str(uuid.uuid4())
+    response = correlated_client.get("/validation-error", headers={"X-Request-ID": inbound})
+
+    assert response.status_code == 422
+    assert response.headers["X-Request-ID"] == inbound
+    assert response.json()["request_id"] == inbound
+
+
+@pytest.mark.api
+def test_error_handler_generates_request_id_without_middleware(client: TestClient) -> None:
+    """When the correlation middleware is not installed (e.g. isolated unit
+    setups), the handler must still emit a valid ``X-Request-ID`` rather than
+    dropping the header."""
+    response = client.get("/unhandled-error")
+
+    assert response.status_code == 500
+    assert "X-Request-ID" in response.headers
+    uuid.UUID(response.headers["X-Request-ID"])
