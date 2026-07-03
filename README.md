@@ -288,6 +288,8 @@ Planned adapter surfaces include:
 - local/S3-like blob storage
 - pgvector vector store
 
+Implementation progress is tracked in [`docs/implementation/roadmap.md`](docs/implementation/roadmap.md).
+
 ---
 
 ## Scope
@@ -318,7 +320,8 @@ Read in this order:
 5. [`docs/technology-decisions.md`](docs/technology-decisions.md)
 6. [`docs/implementation/rules.md`](docs/implementation/rules.md)
 7. [`docs/implementation/patterns.md`](docs/implementation/patterns.md)
-8. [`docs/adr/`](docs/adr/)
+8. [`docs/implementation/roadmap.md`](docs/implementation/roadmap.md)
+9. [`docs/adr/`](docs/adr/)
 
 ---
 

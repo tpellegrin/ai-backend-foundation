@@ -117,6 +117,14 @@ The `Allowed files` block is the exhaustive list of files an implementer may cre
 
 **Permanent exception — the repository-wide `tests/conftest.py`.** The rootdir file `tests/conftest.py` is a permanent, structural part of the repository, not per-task scope. It exists solely to guarantee that pytest **collection** succeeds when a test file imports code that constructs `AppSettings` at import time (notably `app.main`, which per ADR-0023 eagerly calls `create_app()`). Its content is fixed by policy: it may only call `os.environ.setdefault(...)` for the required (non-defaulted) fields of `AppSettings`, with obvious non-production placeholder values. It may not host shared fixtures, mocks, factories, helpers, imports of `app.*`, or any other logic. Tasks may **assume** this file exists and behaves as specified — reviewers must not flag a task for relying on it, and implementers must not create, delete, or restructure it as part of ordinary work. The only sanctioned edit is: **when a task introduces a new *required* field on `AppSettings`, that task must list `tests/conftest.py` in its `Allowed files` and append the corresponding `setdefault` line in the same commit.** No other edits are permitted. Promoting one-off fakes or fixtures into this file is forbidden (see `patterns.md` P-10 / AP-6).
 
+**Permanent exception — the implementation roadmap `docs/implementation/roadmap.md`.** The roadmap file is a status mirror of the task index (see [`./roadmap.md`](./roadmap.md)). It is **not** part of any task's `Allowed files`, and implementers must never mark their own task as done there. The only sanctioned edits are:
+
+- A reviewer flipping the current task's checkbox to `[x]` **after** returning a **PASS** verdict per [`../ai/review-task.md`](../ai/review-task.md) §2.4 (including **PASS WITH MINOR ISSUES** whose safe reviewer patches were applied and re-review returned **PASS**), in the same commit that closes the task or in a follow-up docs-only commit.
+- An implementer flipping their task to `[~]` (in progress / under review) or `[!]` (stop signal raised) — never to `[x]`.
+- Refreshing a task's one-sentence description when the underlying task file materially changes, in the same commit as the task-file change.
+
+Any other edit to `docs/implementation/roadmap.md` is out of scope. Reviewers must not flag a diff for the sanctioned edits above and must flag any edit that anticipates a future task's completion or marks a task done without a matching PASS review.
+
 **Other allowed-files rules:**
 
 - Forbidden imports/files/patterns listed under `Forbidden` must not appear. If you believe you need them, **stop and report** — do not modify other files to make it work.
