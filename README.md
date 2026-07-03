@@ -8,6 +8,14 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 
 ---
 
+## Foundation pillars
+
+| Bounded Architecture | Operational Readiness | Disciplined Delivery |
+| --- | --- | --- |
+| Modules own their domain concepts end to end. Dependency direction is explicit, provider integrations sit behind ports, and architecture rules are enforced mechanically. | Runtime concerns are built in from the start: typed settings, structured errors, request correlation, health probes, structured logging, tracing hooks, and sanitized failure paths. | Work is decomposed into small, reviewable tasks with explicit scope, acceptance criteria, implementation patterns, and stop conditions. |
+
+---
+
 ## What it provides
 
 - **FastAPI application foundation** with a dedicated composition root
