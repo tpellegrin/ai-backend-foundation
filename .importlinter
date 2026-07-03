@@ -19,7 +19,7 @@ layers =
     (app.core)
     (app.auth) | (app.users) | (app.documents) | (app.rag) | (app.ai) | (app.ai_governance)
     (app.llm) | (app.embeddings) | (app.prompts)
-    (app.platform)
+    app.platform
     (app.infrastructure)
     app.observability
     app.shared

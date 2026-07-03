@@ -98,15 +98,15 @@ A clean dependency graph is what makes a codebase *navigable* in year three. We 
 | `PromptRegistry`  | `app.prompts.ports`   | `app.ai`, `app.rag`                                        | `app.prompts.registry` (default)          |
 | `ConversationStore`| `app.ai.ports`       | `app.ai`                                                   | `app.ai.memory.*`                         |
 | `ToolRegistry`    | `app.ai.ports`        | `app.ai`                                                   | `app.ai.tools.*`                          |
-| `BlobStorage`     | `app.infrastructure.storage.ports` | `app.documents`, `app.ai`                       | `app.infrastructure.storage.*`            |
-| `Cache`           | `app.infrastructure.redis.ports`   | many                                              | `app.infrastructure.redis.*`              |
-| `TaskQueue`       | `app.infrastructure.queue.ports`   | `app.documents`, `app.rag`, `app.ai`              | `app.infrastructure.queue.*`              |
+| `BlobStorage`     | `app.platform.storage.ports` | `app.documents`, `app.ai`                            | `app.infrastructure.storage.*`            |
+| `Cache`           | `app.platform.cache.ports`   | many                                                 | `app.infrastructure.redis.*`              |
+| `TaskQueue`       | `app.platform.queue.ports`   | `app.documents`, `app.rag`, `app.ai`                 | `app.infrastructure.queue.*`              |
 | `IdentityProvider`| `app.auth.ports`      | `app.auth`                                                 | `app.auth.adapters.*`                     |
 | `PasswordHasher`  | `app.auth.ports`      | `app.auth`                                                 | `app.auth.adapters.argon2_hasher`         |
 | `TokenSigner`     | `app.auth.ports`      | `app.auth`                                                 | `app.auth.adapters.jwt_signer`            |
 | `Clock`           | `app.shared.clock`    | all                                                        | `app.shared.clock` (system, test)         |
 
-`BlobStorage`, `Cache`, and `TaskQueue` are the rare exceptions where the port lives in `infrastructure/` because they are cross-cutting and no single domain has stronger ownership. They are otherwise treated like any other port.
+`BlobStorage`, `Cache`, and `TaskQueue` are the rare exceptions where the port lives in `platform/` because they are cross-cutting and no single domain has stronger ownership. They are otherwise treated like any other port.
 
 ---
 
