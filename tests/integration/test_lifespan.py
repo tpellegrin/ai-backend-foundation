@@ -8,6 +8,7 @@ from app.core.config.settings import get_settings as bootstrap_settings
 from app.core.container import Container
 from app.core.di import get_container, get_probe_registry, get_settings
 from app.core.lifespan import lifespan
+from app.core.wiring import db
 from app.observability.health import (
     Probe,
     ProbeRegistry,
@@ -36,6 +37,22 @@ def valid_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     }
     for k, v in vars_dict.items():
         monkeypatch.setenv(k, v)
+
+
+@pytest.fixture(autouse=True)
+def mock_db_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock DB wiring to avoid needing a real database in integration tests."""
+    # Mock setup_db to return a mock engine and session factory
+    mock_engine = MagicMock()
+    mock_engine.dispose = AsyncMock()
+    mock_session_factory = MagicMock()
+
+    monkeypatch.setattr(db, "setup_db", lambda _: (mock_engine, mock_session_factory))
+
+    # Mock DBProbe.check to always return OK
+    monkeypatch.setattr(
+        db.DBProbe, "check", AsyncMock(return_value=ProbeResult(name="db", status="ok"))
+    )
 
 
 @pytest.mark.integration

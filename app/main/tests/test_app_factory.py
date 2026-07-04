@@ -1,4 +1,6 @@
 # ruff: noqa: S101, PLR2004
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from starlette.middleware.cors import CORSMiddleware
 from starlette.testclient import TestClient
@@ -6,6 +8,7 @@ from starlette.testclient import TestClient
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.core.config.settings import get_settings
 from app.core.container import Container
+from app.core.wiring import db
 from app.main.app_factory import create_app
 from app.observability.correlation import CorrelationMiddleware
 from app.observability.health import ProbeResult
@@ -36,6 +39,22 @@ def mock_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(k, v)
 
     get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def mock_db_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock DB wiring to avoid needing a real database in unit tests."""
+    # Mock setup_db to return a mock engine and session factory
+    mock_engine = MagicMock()
+    mock_engine.dispose = AsyncMock()
+    mock_session_factory = MagicMock()
+
+    monkeypatch.setattr(db, "setup_db", lambda _: (mock_engine, mock_session_factory))
+
+    # Mock DBProbe.check to always return OK
+    monkeypatch.setattr(
+        db.DBProbe, "check", AsyncMock(return_value=ProbeResult(name="db", status="ok"))
+    )
 
 
 @pytest.mark.unit

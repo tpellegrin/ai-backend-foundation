@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.container import Container
+from app.core.wiring.db import DBProbe, setup_db
 
 
 @asynccontextmanager
@@ -35,11 +36,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 async def _on_startup(container: Container) -> None:
     """Run all startup hooks."""
-    # Placeholder for future wiring (T-701, T-702, etc.)
-    pass
+    # DB wiring (T-701)
+    engine, session_factory = setup_db(container.settings)
+    container.db_engine = engine
+    container.session_factory = session_factory
+    container.probe_registry.add_probe(DBProbe(engine))
 
 
 async def _on_shutdown(container: Container) -> None:
     """Run all shutdown hooks."""
-    # Placeholder for future wiring
-    pass
+    # DB cleanup (T-701)
+    if container.db_engine:
+        await container.db_engine.dispose()

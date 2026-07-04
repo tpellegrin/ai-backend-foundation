@@ -67,7 +67,16 @@ source_modules =
     app.main.**
 forbidden_modules =
     app.infrastructure.**
-
+# Direct-import semantics (see ADR-0025). This forbidden contract enforces the
+# direct-import ban only: no source module listed above may write a direct
+# `from app.infrastructure...` import. The sanctioned composition flow
+# `app.main -> app.core.lifespan -> app.core.wiring.<x> -> app.infrastructure.<x>`
+# (ADR-0023) is a transitive path and is not a violation. The transitive
+# dimension of the architecture is enforced by the `Layers` contract above.
+# Dynamic imports (`importlib.import_module`) or re-export shims used to hide
+# a wiring edge from static analysis are forbidden — see rules.md §1 and
+# review.md §2.
+allow_indirect_imports = True
 [importlinter:contract:platform-bottom]
 name = Platform is below everything except shared
 type = forbidden
