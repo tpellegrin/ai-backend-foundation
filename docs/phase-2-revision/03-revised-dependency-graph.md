@@ -83,6 +83,34 @@ If an edge is not listed, it is forbidden.
 - `app.rag` depends on `app.documents` for `(document_id, chunk_id)` provenance types only (read-only domain types; no persistence).
 - `app.llm` **does not** import `app.ai_governance`. `LlmService` types its governance dependency against `app.llm.ports.GovernanceGate` (see ADR-0024); the concrete implementation is `app.ai_governance.service.GovernanceService`, wired in `app.core.wiring.llm`. Domain-layer consumers of governance (e.g. `app.ai`, `app.rag`) may import `app.ai_governance.ports` directly — same-layer L4, already listed above.
 
+### Sanctioned composition edge (ADR-0023, [ADR-0025](../adr/0025-direct-import-semantics-for-core-wiring-only-infra.md))
+
+The composition flow
+
+```
+app.main.app_factory
+    → app.core.lifespan
+    → app.core.wiring.<capability>
+    → app.infrastructure.<capability>
+```
+
+is a **first-class, statically visible transitive path**. The
+`core-wiring-only-infra` `import-linter` contract enforces a
+**direct-import ban only** (see
+[ADR-0025](../adr/0025-direct-import-semantics-for-core-wiring-only-infra.md)):
+only `app.core.wiring.*` may write `from app.infrastructure... import ...`.
+Transitive reach from `app.main` through `app.core.wiring.*` is permitted
+and required by ADR-0023.
+
+The transitive dimension of the architecture is enforced by the `Layers`
+contract, which forbids any lower layer from importing `app.core.wiring.*`
+(and, through it, `app.infrastructure.*`).
+
+Dynamic imports (`importlib.import_module("app.core.wiring.<x>")`),
+function-local imports of wiring from `lifespan.py`, or re-export shims
+used to hide the composition edge from static analysis are forbidden. See
+`docs/implementation/rules.md` §1 and `docs/implementation/review.md` §2.
+
 ---
 
 ## 3. Forbidden edges (explicit list)

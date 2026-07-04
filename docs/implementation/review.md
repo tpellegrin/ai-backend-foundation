@@ -76,6 +76,7 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
 - Imports
   - [ ] `lint-imports` exit 0.
   - [ ] No new contract `ignore_imports` entries beyond the contracts established in T-107.
+  - [ ] No dynamic imports (`importlib.import_module`), function-local imports of `app.core.wiring.*`, or re-export shims used to hide a composition edge from static analysis (see [ADR-0025](../adr/0025-direct-import-semantics-for-core-wiring-only-infra.md) and `rules.md` §1 *Composition transitive-reach clarification*). If a diff uses any of these to route around `.importlinter`, reject.
 
 ---
 
