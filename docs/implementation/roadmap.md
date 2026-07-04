@@ -77,7 +77,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 - [x] **T-601** — `app/platform/storage/ports.py` (`BlobStorage`) — `BlobRef` + async `BlobStorage` protocol (`put/get/delete/head/generate_presigned_url`).
 - [x] **T-602** — `app/platform/cache/ports.py` (`Cache`) — Async `Cache` protocol with `get/set/delete/incr/expire` and `CacheKey` NewType.
 - [x] **T-603** — `app/platform/queue/ports.py` (`TaskQueue` + `Job`) — Enqueue/status/cancel protocol plus `EnqueueOptions`, `JobId`, `JobStatus`.
-- [ ] **T-604** — `app/platform/rate_limit/ports.py` (`RateLimiter`) — `RateLimitDecision` + `RateLimiter.allow(key, quota, window_s)` protocol.
+- [x] **T-604** — `app/platform/rate_limit/ports.py` (`RateLimiter`) — `RateLimitDecision` + `RateLimiter.allow(key, quota, window_s)` protocol.
 - [ ] **T-605** — `app/platform/idempotency/ports.py` (`IdempotencyStore`) — `IdempotencyRecord` + `begin/complete/get` protocol for retry-safe writes.
 
 ## S07 — Infrastructure base
