@@ -12,13 +12,13 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 
 | Bounded Architecture | Operational Readiness | Disciplined Delivery |
 | --- | --- | --- |
-| Modules own their domain concepts end to end. Dependency direction is explicit, provider integrations sit behind ports, and architecture rules are enforced mechanically. | Runtime concerns are built in from the start: typed settings, structured errors, request correlation, health probes, structured logging, tracing hooks, and sanitized failure paths. | Work is decomposed into small, reviewable tasks with explicit scope, acceptance criteria, implementation patterns, and stop conditions. |
+| Modules own their domain concepts end to end. Dependency boundaries are explicit, provider integrations sit behind ports, and architecture rules are enforced mechanically. | Runtime concerns are built in from the start: typed settings, structured errors, request correlation, health probes, structured logging, tracing hooks, and sanitized failure paths. | Work is decomposed into small, reviewable tasks with explicit scope, acceptance criteria, implementation patterns, and stop conditions. |
 
 ---
 
 ## What it provides
 
-- **FastAPI application foundation** with a dedicated composition root
+- **FastAPI application foundation** with a dedicated composition path
 - **Strict module boundaries** enforced by Import Linter
 - **Typed configuration** with Pydantic Settings
 - **RFC 9457 Problem Details** for consistent API errors
@@ -27,7 +27,8 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 - **Health, readiness, and liveness probes**
 - **Security headers and pagination utilities**
 - **Platform ports** for storage, cache, queue, and future cross-cutting capabilities
-- **Ports-and-adapters architecture** for provider replacement
+- **Pragmatic ports-and-adapters architecture** for provider replacement
+- **Layered application core** with explicit infrastructure adapter boundaries
 - **AI-ready slices** for LLMs, embeddings, prompts, documents, RAG, and governance
 - **Task-driven implementation workflow** with specifications, review contracts, and implementation patterns
 
@@ -53,6 +54,7 @@ The foundation layer currently includes:
 - security headers and pagination
 - health/readiness/liveness infrastructure
 - initial platform ports
+- initial infrastructure foundations
 
 The remaining Phase 2 work completes the golden-path product slice:
 
@@ -62,39 +64,86 @@ documents → ingestion job → embeddings → vector store → RAG answer with 
 
 ---
 
-## Architecture
+## Architecture model
 
-The project follows a layered, modular architecture:
+This project uses a pragmatic **ports-and-adapters** architecture with a layered application core.
+
+In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters, but the repository names the concrete rules explicitly rather than relying on pattern terminology. The goal is simple: application code depends on stable ports, provider-specific code lives behind adapters, and runtime composition happens in one approved place.
+
+The architecture has three main parts:
+
+1. **Layered application core**
+    - `app.main`
+    - `app.api`
+    - `app.core`
+    - domain modules such as `app.documents`, `app.rag`, `app.ai`, and `app.ai_governance`
+    - capability modules such as `app.llm`, `app.embeddings`, and `app.prompts`
+    - platform ports such as storage, cache, queue, rate limiting, and idempotency
+    - shared primitives and observability support
+
+2. **Outer driven-adapter ring**
+    - `app.infrastructure.*`
+    - concrete adapters for Postgres, Redis, storage, queues, HTTP clients, LLM providers, embedding providers, vector stores, and similar runtime integrations
+    - adapters import the ports they implement
+
+3. **Composition surface**
+    - `app.core.wiring.*`
+    - the only approved place where concrete infrastructure adapters are bound into the application
+
+The core rule is:
 
 ```text
-app.main
-  ↓
-app.api
-  ↓
-app.core
-  ↓
-domain modules
-  ↓
-capability modules
-  ↓
-app.platform / app.infrastructure
-  ↓
-app.shared / app.observability
+Application code depends on ports.
+Infrastructure adapters implement ports.
+Only app.core.wiring.* imports concrete infrastructure adapters.
 ```
 
-The dependency graph is part of the architecture and is mechanically enforced.
+Practical dependency shape:
 
-Core rules:
+```text
+Entrypoints call the app:
+app.main / app.api / future app.worker
+        ↓
+Layered application core
+        ↓ depends on ports
+Ports owned by platform/domain/capability modules
 
-- lower layers never import upward
-- `app.main` owns application composition
-- `app.core` owns container, DI, lifespan, and wiring primitives
-- domain modules stay vertically sliced
-- infrastructure adapters do not leak into business logic
-- provider-specific objects never cross port boundaries
-- shared behavior is explicit, not hidden in global helpers
+Infrastructure adapters implement those ports:
+app.infrastructure.* → app.<owner>.ports
 
-See [`docs/dependency-graph.md`](docs/dependency-graph.md).
+Concrete adapters are selected only by:
+app.core.wiring.* → app.infrastructure.*
+```
+
+This means the following is valid:
+
+```text
+app.infrastructure.redis.cache -> app.platform.cache.ports
+app.infrastructure.storage.local -> app.platform.storage.ports
+app.infrastructure.llm_providers.openai -> app.llm.ports
+app.infrastructure.vector_stores.pgvector -> app.rag.ports
+app.core.wiring.cache -> app.infrastructure.redis.cache
+```
+
+And the following is forbidden:
+
+```text
+app.api.* -> app.infrastructure.*
+app.main.* -> app.infrastructure.*
+app.rag.* -> app.infrastructure.*
+app.platform.* -> app.infrastructure.*
+app.infrastructure.redis.* -> app.infrastructure.storage.*
+```
+
+For Phase 2, `app.infrastructure` is the only modeled outer adapter ring for **driven adapters**: technical integrations the application calls outward. Entrypoints and delivery mechanisms such as `app.main`, `app.api`, and future `app.worker` are modeled separately as application edge modules. They are not placed under `app.infrastructure`.
+
+Import boundaries are mechanically enforced with Import Linter. If a task conflicts with those boundaries, implementation stops and the specification or architecture is corrected before code continues.
+
+See:
+
+- [`docs/phase-2-revision/03-revised-dependency-graph.md`](docs/phase-2-revision/03-revised-dependency-graph.md)
+- [`docs/dependency-graph.md`](docs/dependency-graph.md)
+- [`docs/adr/0026-infrastructure-as-outer-adapter-ring.md`](docs/adr/0026-infrastructure-as-outer-adapter-ring.md)
 
 ---
 
@@ -102,13 +151,13 @@ See [`docs/dependency-graph.md`](docs/dependency-graph.md).
 
 ```text
 app/
-  main/              # ASGI entrypoint and app composition
+  main/              # ASGI entrypoint and app creation
   api/               # API edge: errors, routers, pagination, security headers
   core/              # settings, container, DI, lifespan, wiring
   shared/            # shared primitives, application errors, Problem Details
   observability/     # logging, correlation, health, tracing, metrics
   platform/          # cross-cutting ports: storage, cache, queue, etc.
-  infrastructure/    # concrete adapters behind ports
+  infrastructure/    # concrete driven adapters behind ports
 
   auth/              # authentication slice
   users/             # user profile slice
@@ -316,12 +365,13 @@ Read in this order:
 1. [`AGENTS.md`](AGENTS.md)
 2. [`docs/architecture.md`](docs/architecture.md)
 3. [`docs/folder-structure.md`](docs/folder-structure.md)
-4. [`docs/dependency-graph.md`](docs/dependency-graph.md)
-5. [`docs/technology-decisions.md`](docs/technology-decisions.md)
-6. [`docs/implementation/rules.md`](docs/implementation/rules.md)
-7. [`docs/implementation/patterns.md`](docs/implementation/patterns.md)
-8. [`docs/implementation/roadmap.md`](docs/implementation/roadmap.md)
-9. [`docs/adr/`](docs/adr/)
+4. [`docs/phase-2-revision/03-revised-dependency-graph.md`](docs/phase-2-revision/03-revised-dependency-graph.md)
+5. [`docs/dependency-graph.md`](docs/dependency-graph.md)
+6. [`docs/technology-decisions.md`](docs/technology-decisions.md)
+7. [`docs/implementation/rules.md`](docs/implementation/rules.md)
+8. [`docs/implementation/patterns.md`](docs/implementation/patterns.md)
+9. [`docs/implementation/roadmap.md`](docs/implementation/roadmap.md)
+10. [`docs/adr/`](docs/adr/)
 
 ---
 

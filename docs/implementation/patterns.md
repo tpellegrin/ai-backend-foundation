@@ -144,6 +144,85 @@
   `test_queue_ports.py`, `test_rate_limit_ports.py`, `test_idempotency_ports.py`.
 - **Anti-pattern displaced.** AP-10 (generic `test_ports.py` in every module).
 
+### P-14. Ports and adapters: structural conformance
+- **Rule.** Adapters (and test fakes) satisfy `Protocol` ports
+  **structurally**, not by subclassing them. Do **not** write
+  `class RedisCache(Cache):` / `class LocalBlobStorage(BlobStorage):` /
+  `class OpenAIChatModel(ChatModel):`. Write the class without a Protocol
+  base; `mypy --strict` will verify structural conformance, and
+  `isinstance(instance, Port)` still works because ports are marked
+  `@runtime_checkable`. This rule also applies to adapters that live
+  outside `app.infrastructure.*` (e.g. `GovernanceService` structurally
+  satisfies `app.llm.ports.GovernanceGate` per ADR-0024).
+
+  **Driven vs. Entrypoint adapters.**
+  - **Driven adapter:** A concrete integration called **by** the app (DB,
+    Redis, storage, LLM SDK). Belongs under `app.infrastructure.*` and
+    implements a port.
+  - **Entrypoint adapter:** An external trigger calling **into** the app
+    (FastAPI router, worker entrypoint, CLI command, scheduler). Modeled
+    separately (e.g. `app.api`, `app.main`, `app.worker`) and does **not**
+    belong under `app.infrastructure.*` by default.
+- **Why.** Subclassing a `Protocol` couples the adapter to the port class
+  object, invites accidental inheritance of default methods added later,
+  and defeats the "structural conformance" contract that Protocol-based
+  contract tests are meant to defend. Structural satisfaction is the
+  entire point of ports-and-adapters (ADR-0018, ADR-0026).
+- **Documented exception.** None in Phase 2. If a future adapter genuinely
+  requires nominal inheritance (e.g. to inherit `abc.ABC`-style default
+  method implementations), require an ADR that names the exception.
+- **Reference.** Sibling test fakes under `app/platform/cache/tests/`,
+  `app/platform/queue/tests/`, `app/platform/rate_limit/tests/`,
+  `app/platform/idempotency/tests/` — none inherit from their respective
+  Protocol; each is a plain class whose shape matches the port.
+- **Anti-pattern displaced.** AP-11 (inheriting from a `Protocol` port).
+
+### P-15. Provider-adapter task template
+- **Rule.** Any task that introduces a new infrastructure adapter (Redis,
+  local storage, Arq, `httpx`, OpenAI, Anthropic, Google, pgvector,
+  future provider adapters, etc.) must satisfy **all** of the following,
+  and the task spec must state each one explicitly:
+  1. **Port implemented.** State the exact port module + class the
+     adapter implements (e.g. `app.platform.cache.ports.Cache`,
+     `app.llm.ports.ChatModel`).
+  2. **Adapter module path.** Adapter lives under
+     `app/infrastructure/<x>/…`. The SDK for the provider (`openai`,
+     `anthropic`, `redis`, `arq`, `boto3`, `qdrant_client`, ...) is
+     imported **only** in that adapter package.
+  3. **Unique test basename.** Test file is `test_<adapter_name>.py`
+     (e.g. `test_redis_cache.py`, `test_local_storage.py`,
+     `test_openai_chat_model.py`), never a generic
+     `test_cache.py`/`test_client.py`/`test_service.py`.
+  4. **Structural conformance.** The adapter class does **not** inherit
+     from its Protocol port (see **P-14**).
+  5. **No `.importlinter` edits after ADR-0026.** Adapter-to-port imports
+     are already allowed by the project-level adapter-ring contract; the
+     task spec must **not** list `.importlinter` in its `Allowed files`
+     for that direction. The only cases in which a provider-adapter task
+     may edit `.importlinter` are (a) it introduces a genuinely new
+     top-level module that must be added to the `Layers` contract (e.g.
+     `app/worker.py` in T-1402), or (b) an ADR authorizes a scoped
+     amendment. In both cases the amendment must be named in the task's
+     `Allowed files` up front.
+  6. **No SDK leakage.** Adapter translates provider SDK types into the
+     domain / port types at its boundary. Provider SDK types must not
+     appear in return values, parameters, exceptions, or logs outside the
+     adapter package.
+  7. **Observability.** Every external call is observable per AGENTS.md
+     §13. LLM adapters additionally record `LLMCallObservation` with all
+     eleven fields per AGENTS.md §11.
+  8. **Contract test.** The adapter runs the port's contract test suite
+     (parameterized). Integration tests using real infrastructure
+     (Testcontainers Postgres / Redis / pgvector) live under
+     `tests/integration/` and never fake the backend they claim to
+     validate (AGENTS.md §5).
+- **Reference.** Task specs [`T-702`](./tasks/T-702.md),
+  [`T-704`](./tasks/T-704.md), [`T-1212`](./tasks/T-1212.md),
+  [`T-1402`](./tasks/T-1402.md), [`T-1503`](./tasks/T-1503.md).
+- **Anti-pattern displaced.** AP-11 (Protocol subclassing), AP-12
+  (per-task `.importlinter` edits for adapter-to-port imports),
+  AP-13 (generic adapter test basenames).
+
 ---
 
 ## Anti-patterns to avoid
@@ -174,6 +253,18 @@ Anti-patterns reviewers should reject. Each has previously caused a review findi
 - **AP-10.** Generic `test_ports.py` basenames in sibling port packages under
   `app/platform/*/tests/`. Causes pytest `import file mismatch` when two
   such files are collected together. Displaced by **P-13**.
+- **AP-11.** Adapters (or test fakes) that inherit from their `Protocol`
+  port — `class RedisCache(Cache):`, `class LocalBlobStorage(BlobStorage):`,
+  `class OpenAIChatModel(ChatModel):`. Couples the adapter to the port
+  class object and defeats structural conformance. Displaced by **P-14**.
+- **AP-12.** Per-task `.importlinter` edits used to unblock an
+  adapter-to-port import that ADR-0026 already permits (layer swap,
+  `ignore_imports` addition, contract weakening). The correct action is
+  to stop and report, then fix the contract shape via an ADR if the
+  boundary really is wrong. Displaced by **P-15**.
+- **AP-13.** Generic adapter test basenames (`test_cache.py`,
+  `test_client.py`, `test_service.py`, `test_local.py`) that collide the
+  moment a second adapter ships. Displaced by **P-15**.
 
 ---
 

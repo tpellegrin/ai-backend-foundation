@@ -20,6 +20,11 @@ You are a strict reviewer. Approve only when every item below is true.
    - No `app.infrastructure.*` import outside `app.core.wiring.*`.
    - No SDK import outside its adapter file.
    - No cross-module persistence/adapters reach-in.
+   - **Adapter-ring boundary ([ADR-0026](../adr/0026-infrastructure-as-outer-adapter-ring.md)).** For any adapter touched by the diff:
+     - The adapter imports **only** the port(s) it implements and its own siblings under `app.shared` / `app.observability`. It does **not** import `app.main`, `app.api`, or `app.core` (except transitively via wiring). It does **not** import other adapters under `app.infrastructure.*`, and it does not reach into another module's `persistence.py` or `adapters/`.
+     - The diff does **not** edit `.importlinter` for the adapter-to-port direction. Adapter-to-port edges are already allowed by the project-level adapter-ring contract; any diff that re-enables such an edge (layer reorder, new `ignore_imports` entry, contract weakening) is a scope violation → reject and stop.
+     - The diff does **not** use `importlib.import_module(...)`, function-local imports, or re-export shims to hide an adapter edge from `import-linter` / `mypy --strict`.
+     - The adapter satisfies its Protocol **structurally**; it does **not** inherit from the Protocol (`class Foo(SomePort):` is a reject signal) unless the task or an ADR explicitly requires nominal inheritance. Contract-test `isinstance(instance, SomePort)` checks are fine because ports are `@runtime_checkable`.
 4. **Layers.** Domain code does not import FastAPI, SQLAlchemy, httpx, or any SDK.
 5. **Tests.** Every change is covered by a test of the right kind (unit / api / integration / contract). No xfail, skip, or weakening. Coverage ≥ 80%.
 6. **Types.** `mypy --strict` clean on `app/`. Every `# type: ignore` carries a rule code and a one-line reason.
@@ -45,6 +50,10 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
   - [ ] No `os.environ` outside `app/core/config/`.
   - [ ] No cross-module persistence/adapters imports.
   - [ ] No implementation from future tasks was introduced simply to satisfy tooling.
+  - [ ] Adapter-ring boundary (ADR-0026): the diff does not edit `.importlinter` for an adapter-to-port import; does not add `ignore_imports` for such an edge; does not use `importlib.import_module(...)`, function-local imports, or re-export shims to hide an adapter edge.
+  - [ ] Every new adapter satisfies its Protocol port **structurally** (no `class Adapter(Port):` inheritance) unless a task or ADR explicitly requires nominal inheritance.
+  - [ ] Every new adapter imports only the port(s) it implements (plus `app.shared` / `app.observability`); it does not import `app.main`, `app.api`, or `app.core`; it does not import other adapters or another module's `persistence.py` / `adapters/`.
+  - [ ] No entrypoint or delivery concern (API handler, worker, CLI, migration, scheduler) was placed under `app.infrastructure`.
 - Types & layering
   - [ ] `domain.py` is pure; no FastAPI / SQLAlchemy / httpx / SDK imports.
   - [ ] `service.py` returns domain types only.
@@ -84,7 +93,7 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
 
 Use this checklist as a final gate after the per-PR checklist (§2). A PR may not merge if any line below is false.
 
-- Layering (top→bottom): `main` → `api` → `core` → domain (`auth|users|documents|rag|ai|ai_governance`) → capability (`llm|embeddings|prompts`) → `platform` → `infrastructure` → leaves (`shared`, `observability`). A module at layer `N` imports only from layers `< N`.
+- Layering (top→bottom): `main` → `api` → `core` → domain (`auth|users|documents|rag|ai|ai_governance`) → capability (`llm|embeddings|prompts`) → `platform` → leaves (`shared`, `observability`). A module at layer `N` imports only from layers `< N`. `app.infrastructure` is an outer adapter ring outside this stack.
 - **Only `app.core.wiring.*` may import from `app.infrastructure.*`.** Nowhere else. Ever.
 - Domain code imports **ports** from `app.platform.*`, never adapters.
 - `app.llm`, `app.embeddings`, `app.prompts` are siblings and **do not** import each other.

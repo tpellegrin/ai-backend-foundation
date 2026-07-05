@@ -13,6 +13,9 @@ root_packages =
 [importlinter:contract:layers]
 name = Layers
 type = layers
+# NOTE: The `Layers` contract governs the layered core and entrypoints only.
+# `app.infrastructure` is modeled as an outer driven-adapter ring (ADR-0026)
+# and is governed by explicit boundary contracts below.
 layers =
     (app.main)
     (app.api)
@@ -20,7 +23,6 @@ layers =
     (app.auth) | (app.users) | (app.documents) | (app.rag) | (app.ai) | (app.ai_governance)
     (app.llm) | (app.embeddings) | (app.prompts)
     app.platform
-    (app.infrastructure)
     app.observability
     app.shared
 
@@ -65,18 +67,55 @@ source_modules =
     app.ai_governance.**
     app.api.**
     app.main.**
+    app.core.lifespan
+    app.core.container
+    app.core.config.**
+    app.core.di
+    app.core.tests.**
 forbidden_modules =
     app.infrastructure.**
-# Direct-import semantics (see ADR-0025). This forbidden contract enforces the
-# direct-import ban only: no source module listed above may write a direct
-# `from app.infrastructure...` import. The sanctioned composition flow
+# Direct-import semantics (see ADR-0025, ADR-0026). This forbidden contract
+# enforces the direct-import ban only: no source module listed above may write
+# a direct `from app.infrastructure...` import. The sanctioned composition flow
 # `app.main -> app.core.lifespan -> app.core.wiring.<x> -> app.infrastructure.<x>`
-# (ADR-0023) is a transitive path and is not a violation. The transitive
-# dimension of the architecture is enforced by the `Layers` contract above.
-# Dynamic imports (`importlib.import_module`) or re-export shims used to hide
-# a wiring edge from static analysis are forbidden — see rules.md §1 and
-# review.md §2.
+# (ADR-0023) is a transitive path and is not a violation. Dynamic imports
+# (`importlib.import_module`) or re-export shims used to hide a wiring edge
+# from static analysis are forbidden — see rules.md §1 and review.md §2.
+# `app.core.wiring.**` is intentionally omitted from `source_modules` as it
+# is the sanctioned binding surface.
 allow_indirect_imports = True
+
+[importlinter:contract:infrastructure-boundary]
+name = Infrastructure adapter-ring boundary
+type = forbidden
+source_modules =
+    app.infrastructure.**
+forbidden_modules =
+    app.main.**
+    app.api.**
+    app.core.**
+# ADR-0026: Infrastructure adapters (driven) live outside the core stack;
+# they implement ports and import them, but they must never import the
+# application entrypoints or core composition logic (except transitively
+# via wiring, which is not handled by this direct-import contract).
+# Adapters are allowed to import shared, observability, and port-owning
+# modules below core.
+allow_indirect_imports = True
+
+[importlinter:contract:adapters-independent]
+name = Infrastructure adapters are independent
+type = independence
+modules =
+    app.infrastructure.db.**
+    app.infrastructure.redis.**
+    app.infrastructure.storage.**
+    app.infrastructure.queue.**
+    app.infrastructure.llm_providers.**
+    app.infrastructure.embedding_providers.**
+    app.infrastructure.vector_stores.**
+# ADR-0026: Adapters should not import other adapters. Cross-adapter
+# composition belongs in `app.core.wiring.*`.
+
 [importlinter:contract:platform-bottom]
 name = Platform is below everything except shared
 type = forbidden

@@ -1,11 +1,12 @@
 # Module Dependency Graph
-
 > **Superseded by** [`phase-2-revision/03-revised-dependency-graph.md`](phase-2-revision/03-revised-dependency-graph.md).
 >
 > This document predates the Phase 2 revision pack and is retained for historical
-> reference only. It does not model `app.platform` as its own layer and its
-> allowed-edge table is out of date. For the authoritative dependency graph (and
-> the one mirrored by `.importlinter`), read the revised graph linked above.
+> reference only. It does not model `app.platform` as its own layer, does not
+> model `app.infrastructure` as the **outer adapter ring** ([ADR-0026](adr/0026-infrastructure-as-outer-adapter-ring.md)),
+> and its allowed-edge table is out of date. For the authoritative dependency
+> graph (and the one mirrored by `.importlinter`), read the revised graph:
+> [**docs/phase-2-revision/03-revised-dependency-graph.md**](phase-2-revision/03-revised-dependency-graph.md).
 > New contributors: follow the revised graph; do not add rules here.
 
 > The dependency graph is part of the architecture. It will be enforced mechanically (see [ADR-0011](adr/0011-enforce-module-boundaries-with-import-linter.md)).
@@ -17,31 +18,31 @@ A clean dependency graph is what makes a codebase *navigable* in year three. We 
 ## 1. Layers (top imports from bottom, never the other way)
 
 ```
-                    ┌────────────────────────────────────────────┐
-        L5  edge    │  app.main                                  │
-                    │  app.api  (v1 mount, error handlers, …)    │
-                    └──────────────┬─────────────────────────────┘
-                                   │ imports
-                    ┌──────────────▼─────────────────────────────┐
-        L4  comp.   │  app.core  (container, lifespan, di, wiring)│
-                    └──────────────┬─────────────────────────────┘
-                                   │
-                    ┌──────────────▼─────────────────────────────┐
-        L3  domain  │  app.auth  app.users  app.ai  app.rag      │
-                    │  app.documents                             │
-                    └──────────────┬─────────────────────────────┘
-                                   │
-                    ┌──────────────▼─────────────────────────────┐
-        L2  cap.    │  app.llm  app.embeddings  app.prompts      │
-                    └──────────────┬─────────────────────────────┘
-                                   │
-                    ┌──────────────▼─────────────────────────────┐
-        L1  infra   │  app.infrastructure.*                      │
-                    └──────────────┬─────────────────────────────┘
-                                   │
-                    ┌──────────────▼─────────────────────────────┐
-        L0  leaves  │  app.shared    app.observability            │
-                    └────────────────────────────────────────────┘
+                    ┌──────────────────────────────────────────────┐
+        L5  edge    │  app.main                                    │
+                    │  app.api  (v1 mount, error handlers, …)      │
+                    └──────────────────────┬───────────────────────┘
+                                           │ imports
+                    ┌──────────────────────▼───────────────────────┐
+        L4  comp.   │  app.core  (container, lifespan, di, wiring) │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                    ┌──────────────────────▼───────────────────────┐
+        L3  domain  │  app.auth  app.users  app.ai  app.rag        │
+                    │  app.documents                               │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                    ┌──────────────────────▼───────────────────────┐
+        L2  cap.    │  app.llm  app.embeddings  app.prompts        │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                    ┌──────────────────────▼───────────────────────┐
+        L1  infra   │  app.infrastructure.*                        │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                    ┌──────────────────────▼───────────────────────┐
+        L0  leaves  │  app.shared    app.observability             │
+                    └──────────────────────────────────────────────┘
 ```
 
 **Rule of thumb**: a module at level `Ln` may import from levels `< n` only. Same-level cross-imports are forbidden by default and require an ADR to introduce.
