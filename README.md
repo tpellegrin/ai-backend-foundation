@@ -89,6 +89,7 @@ The architecture has three main parts:
 3. **Composition surface**
     - `app.core.wiring.*`
     - the only approved place where concrete infrastructure adapters are bound into the application
+    - organized in three levels per [ADR-0030](docs/adr/0030-centralize-application-wiring.md): **resource wiring** (long-lived clients/engines), **adapter wiring** (wrapping resources into port implementations), and **use-case wiring** (composing application workflows from ports)
 
 The core rule is:
 
@@ -144,6 +145,9 @@ See:
 - [`docs/phase-2-revision/03-revised-dependency-graph.md`](docs/phase-2-revision/03-revised-dependency-graph.md)
 - [`docs/dependency-graph.md`](docs/dependency-graph.md)
 - [`docs/adr/0026-infrastructure-as-outer-adapter-ring.md`](docs/adr/0026-infrastructure-as-outer-adapter-ring.md)
+- [`docs/adr/0027-use-pragmatic-ports-and-adapters.md`](docs/adr/0027-use-pragmatic-ports-and-adapters.md)
+- [`docs/adr/0029-keep-framework-and-provider-type-at-the-edges.md`](docs/adr/0029-keep-framework-and-provider-type-at-the-edges.md)
+- [`docs/adr/0030-centralize-application-wiring.md`](docs/adr/0030-centralize-application-wiring.md)
 
 ---
 

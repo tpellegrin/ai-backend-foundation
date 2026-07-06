@@ -1,10 +1,10 @@
 # ADR-0029: Keep framework and provider types at the edges
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-05
 - Supersedes: none
 - Superseded by: none
-- Related: ADR-0018 (platform ports layer), ADR-0026 (infrastructure as an outer adapter ring), ADR-0027 (pragmatic ports-and-adapters), ADR-0028 (module-local use-case orchestration)
+- Related: ADR-0018 (platform ports layer), ADR-0026 (infrastructure as an outer adapter ring), ADR-0027 (pragmatic ports-and-adapters), ADR-0028 (module-local use-case orchestration), ADR-0030 (centralized application wiring and container boundaries)
 
 ## Context
 
@@ -24,21 +24,14 @@ This ADR makes that rule explicit.
 
 ## Decision
 
-Framework-specific and provider-specific types must stay at the appropriate edge.
+Framework-specific and provider-specific types must stay at the appropriate edge. The project has two distinct edges:
 
-The following are edge concerns:
+1. **Delivery edge** — inbound entrypoints: `app.main`, `app.api`, and future `app.worker`.
+   FastAPI, Starlette, request/response types, and worker-entry types live here.
+2. **Driven-adapter edge** — outbound integrations: `app.infrastructure.*`.
+   Provider SDKs (OpenAI, Anthropic, etc.), DB drivers, Redis clients, storage clients, pgvector drivers, Arq client/job types, HTTPX transport clients, and other concrete external integration types live here.
 
-- FastAPI request, response, routing, dependency, and exception primitives;
-- SQLAlchemy engine/session/model-specific infrastructure primitives;
-- Redis client types;
-- Arq worker/client/job types;
-- HTTPX client/response types where used as provider transport;
-- OpenAI, Anthropic, or provider SDK request/response objects;
-- pgvector/vector-store driver objects;
-- storage SDK objects;
-- any other concrete external integration type.
-
-These types must not leak into domain, capability, platform port, or use-case boundaries unless a task or ADR explicitly authorizes the boundary.
+Delivery-edge types must not leak into the driven-adapter ring. Driven-adapter-edge types must not leak into the delivery edge. Neither edge type may leak into domain, capability, platform port, or use-case boundaries.
 
 The preferred flow is:
 
@@ -54,7 +47,7 @@ The preferred flow is:
 
 2. Provider SDK types belong in `app.infrastructure.*` or in narrowly approved adapter modules.
 
-3. SQLAlchemy infrastructure types belong in infrastructure DB modules, persistence modules, or approved wiring/session boundaries.
+3. `AsyncSession` and SQLAlchemy engine/`sessionmaker` construction belongs in `app.infrastructure.db` or approved wiring/session boundaries. SQLAlchemy mapped classes live behind a module persistence boundary and must not cross that module boundary. Queries should return project-owned/domain types, not mapped classes.
 
 4. Domain, capability, and use-case code should depend on project-owned ports and DTOs, not provider SDK payloads.
 
@@ -64,7 +57,7 @@ The preferred flow is:
 
 7. Infrastructure adapters are responsible for translating provider-specific objects into project-owned results or errors.
 
-8. If an external type appears in an inner module, the task must explain why and the reviewer must treat it as an architectural decision.
+8. If an external framework/provider type must appear in an inner module, that requires an ADR. A task-level note is not sufficient.
 
 ## Consequences
 
@@ -149,6 +142,10 @@ Task specs that introduce provider integrations must explicitly state:
 - which wiring surface binds the adapter.
 
 If the task does not specify those boundaries, implementation must stop and the task spec must be corrected.
+
+## Relationship to ADR-0030
+
+ADR-0030 defines centralized wiring and the container boundary. Wiring modules under `app.core.wiring.*` are the only inner surface allowed to import concrete infrastructure adapters (and, transitively, provider SDKs) at construction time. Enforcement of the SDK-at-adapter rule is therefore a wiring/import-linter concern; see ADR-0030 and `.importlinter`.
 
 ## Summary
 

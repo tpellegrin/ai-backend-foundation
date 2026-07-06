@@ -4,7 +4,9 @@
 - Date: 2026-07-05
 - Supersedes: none
 - Superseded by: none
-- Related: ADR-0027 (pragmatic ports-and-adapters over strict Clean Architecture rings)
+- Related: ADR-0027 (pragmatic ports-and-adapters over strict Clean Architecture rings), ADR-0029 (framework and provider types at the edges), ADR-0030 (centralized application wiring and container boundaries)
+
+> **Status note.** This ADR remains **Proposed** until the first non-trivial multi-port workflow lands in the repository (for example, `answer_question` or `ingest_document`). Accepting it requires a companion update to `AGENTS.md` and `docs/folder-structure.md` if `use_cases/` becomes an allowed module-local subpackage. Until then, `use_cases/` is **not** an accepted module-local convention and must not be introduced.
 
 ## Context
 

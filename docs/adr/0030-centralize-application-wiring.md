@@ -1,6 +1,6 @@
 # ADR-0030: Centralize application wiring and container boundaries
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-05
 - Supersedes: none
 - Superseded by: none
@@ -166,19 +166,22 @@ Use-case wiring must be the place where concrete runtime implementations are ass
 
 ## Container boundary
 
-The project may use a small typed application container.
+The application container is a small typed record, preferably a frozen `dataclass` (or an equivalent typed record), constructed exactly once during application startup/lifespan.
 
 The container may hold:
 
 - settings;
-- lifecycle-managed resources;
-- health probe registry;
-- observability providers;
-- prebuilt adapter instances;
+- lifecycle-managed resource references;
+- adapter instances that implement ports;
 - use-case factories or accessors;
-- other application-wide runtime objects.
+- health probe registry and observability providers.
 
-The container must not become an unrestricted service locator.
+The container is not:
+
+- a registry;
+- a runtime lookup table;
+- a service locator;
+- a factory-of-factories.
 
 Only the following modules may access the application container directly:
 
@@ -188,6 +191,8 @@ app.core.lifespan
 app.core.wiring.*
 app.api.dependencies.*
 ```
+
+A future `app.worker.*` entrypoint may be added to this whitelist only when introduced by a later task or ADR. It is not part of this ADR.
 
 Domain modules, capability modules, platform modules, and infrastructure adapters must not retrieve dependencies from the container.
 
@@ -244,7 +249,7 @@ API modules translate HTTP into application calls. They do not assemble infrastr
 
 3. `app.api.*` must not import `app.infrastructure.*`.
 
-4. `app.main.*` must not directly import `app.infrastructure.*` unless a specific ADR or task explicitly authorizes that composition path.
+4. `app.main` must not import `app.infrastructure.*`. `app.main` creates the FastAPI application and delegates lifecycle to `app.core.lifespan`. `app.core.lifespan` and `app.core.wiring.*` own runtime construction.
 
 5. `app.core.lifespan` may coordinate lifecycle by calling approved `app.core.wiring.*` functions.
 
@@ -261,6 +266,39 @@ API modules translate HTTP into application calls. They do not assemble infrastr
 11. Resource creation must be centralized so lifecycle, cleanup, health checks, and observability remain consistent.
 
 12. If a task needs a new runtime dependency, it must add or update the appropriate wiring module rather than constructing the dependency ad hoc.
+
+## Wiring module naming
+
+Resource and adapter wiring modules are named by the technical concern they compose:
+
+```text
+app.core.wiring.db
+app.core.wiring.cache
+app.core.wiring.storage
+app.core.wiring.queue
+app.core.wiring.llm
+app.core.wiring.embeddings
+app.core.wiring.vector_store
+app.core.wiring.http
+```
+
+Use-case wiring modules mirror the name of the owning domain/capability module:
+
+```text
+app.core.wiring.rag           # composes app.rag use cases
+app.core.wiring.documents     # composes app.documents use cases
+app.core.wiring.ai_governance # composes app.ai_governance use cases
+```
+
+Wiring modules contain construction, configuration reading, and lifecycle registration only. Wiring modules must not contain business logic.
+
+## Testing rule
+
+Once the application container exists, CI should include a wiring smoke test that constructs the full application container against test settings on every run. The test does not exercise routes; it only proves the object graph assembles. This catches wiring drift before it reaches integration tests.
+
+## Relationship to ADR-0029
+
+ADR-0029 governs which framework and provider types are allowed at which edges. Wiring modules are the only inner surface permitted to import concrete provider SDKs and infrastructure adapters at construction time. See ADR-0029 for the delivery-edge vs driven-adapter-edge split.
 
 ## Consequences
 

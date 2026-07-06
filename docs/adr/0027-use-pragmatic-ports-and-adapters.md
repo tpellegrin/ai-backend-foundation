@@ -1,10 +1,12 @@
 # ADR-0027: Use pragmatic ports-and-adapters over strict Clean Architecture rings
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-05
 - Supersedes: none
 - Superseded by: none
-- Related: ADR-0018 (platform ports layer), ADR-0023 (composition-root ownership), ADR-0026 (infrastructure as an outer adapter ring)
+- Related: ADR-0018 (platform ports layer), ADR-0023 (composition-root ownership), ADR-0026 (infrastructure as an outer adapter ring), ADR-0028 (module-local use-case orchestration), ADR-0029 (framework and provider types at the edges), ADR-0030 (centralized application wiring and container boundaries)
+
+ADR-0027 is the philosophy/umbrella ADR for the project's architectural approach. ADR-0028, ADR-0029, and ADR-0030 are its more enforceable projections. Mechanical enforcement lives in `.importlinter` (import boundary contracts), `docs/dependency-graph.md` and `docs/folder-structure.md` (structural rules), and the project's review and task specifications.
 
 ## Context
 
@@ -122,11 +124,11 @@ This is simpler at first, but it is a poor fit for replaceable provider adapters
 
 A central ports package would simplify import rules.
 
-Rejected for now.
+Rejected.
 
-It weakens local ownership. For example, `VectorStore` is a RAG boundary and belongs near `app.rag`; `ChatModel` is an LLM boundary and belongs near `app.llm`; `Cache` is a platform boundary and belongs near `app.platform.cache`.
+ADR-0018 already established that ports live with their owning modules (`VectorStore` near `app.rag`, `ChatModel` near `app.llm`, `Cache` near `app.platform.cache`). A global `app.ports` package weakens local ownership and could become an abstraction dumping ground.
 
-A global ports package could become an abstraction dumping ground.
+Reopening a global `app.ports` package requires a new ADR that supersedes ADR-0018.
 
 ### 4. Continue with pragmatic ports-and-adapters and module ownership
 

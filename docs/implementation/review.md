@@ -54,6 +54,8 @@ When approving, the reviewer model must explicitly confirm: *"Verified against A
   - [ ] Every new adapter satisfies its Protocol port **structurally** (no `class Adapter(Port):` inheritance) unless a task or ADR explicitly requires nominal inheritance.
   - [ ] Every new adapter imports only the port(s) it implements (plus `app.shared` / `app.observability`); it does not import `app.main`, `app.api`, or `app.core`; it does not import other adapters or another module's `persistence.py` / `adapters/`.
   - [ ] No entrypoint or delivery concern (API handler, worker, CLI, migration, scheduler) was placed under `app.infrastructure`.
+  - [ ] Wiring boundary ([ADR-0030](../adr/0030-centralize-application-wiring.md)): FastAPI dependency providers (`app.api.dependencies.*`, per-router `Depends` factories) do **not** import `app.infrastructure.*` and do **not** manually construct concrete adapters; they only retrieve already-wired objects from the application container or `app.core.wiring.*`.
+  - [ ] API modules do not manually construct infrastructure adapters. Concrete adapter construction lives in `app.core.wiring.*` (ADR-0030).
 - Types & layering
   - [ ] `domain.py` is pure; no FastAPI / SQLAlchemy / httpx / SDK imports.
   - [ ] `service.py` returns domain types only.
