@@ -84,12 +84,12 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 
 - [x] **T-701** — `app/infrastructure/db/` — Async engine, `async_sessionmaker`, `DeclarativeBase`, and pgvector SQLAlchemy type registration.
 - [x] **T-702** — `app/infrastructure/redis/` (+ `Cache` adapter) — `build_client(settings)` and `RedisCache` implementing the `Cache` port.
-- [ ] **T-703** — `app/infrastructure/http/` shared httpx — `AsyncClient` factory with HTTPX instrumentation wired via `app.core.wiring.observability`.
-- [ ] **T-704** — `infrastructure/storage/local.py` (`BlobStorage` local) — Local-filesystem adapter for the Phase 2 `BlobStorage` port.
+- [x] **T-703** — `app/infrastructure/http/` shared httpx — `AsyncClient` factory with HTTPX instrumentation wired via `app.core.wiring.observability`.
+- [x] **T-704** — `infrastructure/storage/local.py` (`BlobStorage` local) — Local-filesystem adapter for the Phase 2 `BlobStorage` port.
 - [ ] **T-705** — *(removed — deferred to Phase 3)* — S3 adapter is not part of Phase 2.
-- [ ] **T-706** — `infrastructure/rate_limit/redis.py` — Redis-Lua atomic rate limiter with `rl:{key}` namespace.
-- [ ] **T-707** — `infrastructure/idempotency/redis.py` — Redis-backed `IdempotencyStore` adapter.
-- [ ] **T-708** — `core/wiring/storage.py`, `cache.py` — Wiring that returns Protocol-typed `BlobStorage` and `Cache` bound into the `Container`.
+- [x] **T-706** — `infrastructure/rate_limit/redis.py` — Redis-Lua atomic rate limiter with `rl:{key}` namespace.
+- [x] **T-707** — `infrastructure/idempotency/redis.py` — Redis-backed `IdempotencyStore` adapter.
+- [x] **T-708** — `core/wiring/storage.py`, `cache.py` — Wiring that returns Protocol-typed `BlobStorage` and `Cache` bound into the `Container`.
 
 ## S08 — Persistence + migrations
 
