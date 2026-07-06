@@ -8,7 +8,7 @@ from app.core.config.settings import get_settings as bootstrap_settings
 from app.core.container import Container
 from app.core.di import get_container, get_probe_registry, get_settings
 from app.core.lifespan import lifespan
-from app.core.wiring import db
+from app.core.wiring import cache, db
 from app.observability.health import (
     Probe,
     ProbeRegistry,
@@ -52,6 +52,22 @@ def mock_db_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
     # Mock DBProbe.check to always return OK
     monkeypatch.setattr(
         db.DBProbe, "check", AsyncMock(return_value=ProbeResult(name="db", status="ok"))
+    )
+
+
+@pytest.fixture(autouse=True)
+def mock_cache_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock Redis/Cache wiring to avoid needing a real Redis in integration tests."""
+    mock_client = MagicMock()
+    mock_client.aclose = AsyncMock()
+    mock_cache_adapter = MagicMock()
+
+    monkeypatch.setattr(cache, "setup_redis_client", lambda _: mock_client)
+    monkeypatch.setattr(cache, "setup_cache", lambda _: mock_cache_adapter)
+
+    # Mock RedisProbe.check to always return OK
+    monkeypatch.setattr(
+        cache.RedisProbe, "check", AsyncMock(return_value=ProbeResult(name="redis", status="ok"))
     )
 
 
