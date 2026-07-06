@@ -90,6 +90,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 - [x] **T-706** — `infrastructure/rate_limit/redis.py` — Redis-Lua atomic rate limiter with `rl:{key}` namespace.
 - [x] **T-707** — `infrastructure/idempotency/redis.py` — Redis-backed `IdempotencyStore` adapter.
 - [x] **T-708** — `core/wiring/storage.py`, `cache.py` — Wiring that returns Protocol-typed `BlobStorage` and `Cache` bound into the `Container`.
+- [ ] **T-709** — Lifespan readiness ordering fix — Move `app.state.ready = True` to the final step of successful startup, after Redis wiring and `RedisProbe` registration, so `/readyz` never reports ready before all wired resources are initialized.
 
 ## S08 — Persistence + migrations
 
