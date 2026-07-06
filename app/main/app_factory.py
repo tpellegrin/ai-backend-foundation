@@ -7,6 +7,7 @@ from app.api.v1 import build_v1_router
 from app.core.config.settings import AppSettings, get_settings
 from app.core.container import Container
 from app.core.lifespan import lifespan
+from app.core.wiring.observability import apply_httpx_instrumentation
 from app.observability.correlation import CorrelationMiddleware
 from app.observability.health import ProbeRegistry, build_health_router
 from app.observability.logging import configure_logging
@@ -22,6 +23,7 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     # 1. Resolve settings and configure logging
     settings = settings if settings is not None else get_settings()
     configure_logging(level=settings.logging.level, json=settings.app.env != "dev")
+    apply_httpx_instrumentation(settings)
 
     # 2. Construct the initial Container
     # This is the sole construction site for both objects for the process lifetime.
