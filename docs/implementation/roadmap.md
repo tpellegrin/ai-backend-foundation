@@ -83,7 +83,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 ## S07 — Infrastructure base
 
 - [x] **T-701** — `app/infrastructure/db/` — Async engine, `async_sessionmaker`, `DeclarativeBase`, and pgvector SQLAlchemy type registration.
-- [x] **T-702** — `app/infrastructure/redis/` (+ `Cache` adapter) — `build_client(settings)` and `RedisCache` implementing the `Cache` port.
+- [ ] **T-702** — `app/infrastructure/redis/` (+ `Cache` adapter) — `build_client(settings)` and `RedisCache` implementing the `Cache` port.
 - [ ] **T-703** — `app/infrastructure/http/` shared httpx — `AsyncClient` factory with HTTPX instrumentation wired via `app.core.wiring.observability`.
 - [ ] **T-704** — `infrastructure/storage/local.py` (`BlobStorage` local) — Local-filesystem adapter for the Phase 2 `BlobStorage` port.
 - [ ] **T-705** — *(removed — deferred to Phase 3)* — S3 adapter is not part of Phase 2.
