@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -122,6 +123,9 @@ async def test_lifespan_lifecycle(valid_env_vars: None) -> None:
         assert app.state.container is container
         assert app.state.ready is True
 
+        # T-709: Verify readiness coincides with redis probe registration
+        assert any(p.name == "redis" for p in container.probe_registry.probes)
+
         # Verify probe is visible and /readyz is 200
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get("/readyz")
@@ -149,3 +153,33 @@ async def test_lifespan_lifecycle(valid_env_vars: None) -> None:
     response = Response()
     res = await handler(response)
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+@pytest.mark.integration
+async def test_lifespan_readiness_no_premature_flip(
+    valid_env_vars: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that app.state.ready is not flipped if Redis setup fails (T-709)."""
+    settings = bootstrap_settings()
+    registry = ProbeRegistry([])
+    container = Container(settings=settings, probe_registry=registry)
+
+    app = FastAPI(lifespan=lifespan)
+    app.state.container = container
+    app.state.ready = False
+
+    # Stub setup_redis_client to raise an error
+    def raise_error(_: object) -> None:
+        # T-709: app.state.ready must still be False when setup_redis_client is called
+        assert app.state.ready is False
+        raise RuntimeError("Failed")
+
+    lifespan_mod = sys.modules["app.core.lifespan"]
+    monkeypatch.setattr(lifespan_mod, "setup_redis_client", raise_error)
+
+    # Execute lifespan and verify it propagates error without flipping ready
+    with pytest.raises(RuntimeError, match="Failed"):
+        async with lifespan(app):
+            pass
+
+    assert app.state.ready is False

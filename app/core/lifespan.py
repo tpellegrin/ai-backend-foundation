@@ -25,9 +25,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 3. Startup hooks
     await _on_startup(container)
 
-    # 4. Success -> ready
-    app.state.ready = True
-
     # Redis/Cache wiring (T-708)
     redis_client = setup_redis_client(container.settings)
 
@@ -35,6 +32,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Redis/Cache wiring (T-708)
         container.cache = setup_cache(redis_client)
         container.probe_registry.add_probe(RedisProbe(redis_client))
+
+        # 4. Success -> ready (T-709: moved to the end of startup)
+        app.state.ready = True
         yield
     finally:
         # 5. Shutdown -> not ready
