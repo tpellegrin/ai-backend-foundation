@@ -18,7 +18,7 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 
 ## What it provides
 
-- **FastAPI application foundation** with a dedicated composition path
+- **FastAPI application foundation** with explicit app creation, lifespan, and wiring boundaries
 - **Strict module boundaries** enforced by Import Linter
 - **Typed configuration** with Pydantic Settings
 - **RFC 9457 Problem Details** for consistent API errors
@@ -68,7 +68,7 @@ documents → ingestion job → embeddings → vector store → RAG answer with 
 
 This project uses a pragmatic **ports-and-adapters** architecture with a layered application core.
 
-In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters, but the repository names the concrete rules explicitly rather than relying on pattern terminology. The goal is simple: application code depends on stable ports, provider-specific code lives behind adapters, and runtime composition happens in one approved place.
+In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters. The repository makes the concrete dependency rules explicit so the architecture can be enforced mechanically rather than treated as convention. The goal is simple: application code depends on stable ports, provider-specific code lives behind adapters, and runtime composition happens in approved wiring surfaces.
 
 The architecture has three main parts:
 
@@ -88,8 +88,8 @@ The architecture has three main parts:
 
 3. **Composition surface**
     - `app.core.wiring.*`
-    - the only approved place where concrete infrastructure adapters are bound into the application
-    - organized in three levels per [ADR-0030](docs/adr/0030-centralize-application-wiring.md): **resource wiring** (long-lived clients/engines), **adapter wiring** (wrapping resources into port implementations), and **use-case wiring** (composing application workflows from ports)
+    - the approved place for resource wiring, adapter wiring, and use-case wiring
+    - the only place where concrete infrastructure adapters are bound into application workflows
 
 The core rule is:
 
@@ -98,6 +98,17 @@ Application code depends on ports.
 Infrastructure adapters implement ports.
 Only app.core.wiring.* imports concrete infrastructure adapters.
 ```
+
+Runtime construction follows the same boundary:
+
+```text
+Resources are created by wiring.
+Adapters are created by wiring.
+Use cases are assembled by wiring.
+API handlers receive already-wired application objects.
+```
+
+FastAPI dependency injection is used at the API edge, but it is not the application’s composition model. API dependencies may retrieve already-wired use cases or request-scoped edge concerns; they must not manually construct Redis, database, OpenAI, storage, queue, or vector-store adapters.
 
 Practical dependency shape:
 
@@ -241,7 +252,7 @@ These documents define how implementation and review agents should:
 - apply review findings
 - produce deterministic review reports
 - avoid speculative future work
-- preserve dependency direction
+- preserve dependency boundaries
 
 Implementation patterns are captured in:
 
