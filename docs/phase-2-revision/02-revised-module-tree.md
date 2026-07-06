@@ -48,7 +48,8 @@ ai-backend-foundation/                          # CHANGED: renamed from ai-backe
     │       ├── storage.py
     │       ├── cache.py
     │       ├── queue.py
-    │       └── governance.py
+    │       ├── governance.py
+    │       └── observability.py
     │
     ├── shared/                                 # leaf utilities, no app.* deps
     │   ├── errors.py

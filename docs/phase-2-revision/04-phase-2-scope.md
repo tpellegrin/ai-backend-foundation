@@ -22,7 +22,7 @@
 ## 2. App foundation (`app/`)
 
 - `app/main/` — composition site and ASGI entrypoint **package** (`app/main/app_factory.py::create_app()`); no top-level `app/main.py` module.
-- `app/core/` — `config/` (Pydantic Settings, env-driven, fails fast); `app_factory.py`; `lifespan.py`; `container.py`; `di.py`; `wiring/{llm,embeddings,vector_store,storage,cache,queue,governance}.py`.
+- `app/core/` — `config/` (Pydantic Settings, env-driven, fails fast); `app_factory.py`; `lifespan.py`; `container.py`; `di.py`; `wiring/{llm,embeddings,vector_store,storage,cache,queue,governance,observability}.py`.
 - `app/shared/` — full (errors, problem_details, pagination, ids, clock, result, types, pydantic base).
 - `app/observability/` — structlog config; OTel tracer/meter setup (exporters constructed in `core.wiring` and registered here); correlation middleware (`X-Request-ID` in/out); access log middleware; exception → Problem Details handler; `/healthz`, `/readyz`, `/livez`, optional `/metrics`.
 - `app/platform/` — all five port modules (`storage`, `cache`, `queue`, `rate_limit`, `idempotency`). Protocols only. No SDKs imported.
