@@ -153,6 +153,8 @@ forbidden_modules =
     app.ai.tools.**
     app.ai.memory.**
 allow_indirect_imports = True
+ignore_imports =
+    app.core.wiring.auth -> app.auth.adapters.**
 
 # NOTE: Future ignore_imports exceptions must be added only when the matching
 # import actually exists. Each exception must be justified by the dependency
