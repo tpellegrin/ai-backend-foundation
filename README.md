@@ -1,6 +1,6 @@
 # AI Backend Foundation
 
-A production-grade backend foundation for AI-native products.
+A production-grade FastAPI backend foundation for AI-native products.
 
 AI Backend Foundation provides the architecture, runtime structure, and engineering discipline needed to build reliable systems around LLMs, retrieval, document processing, background jobs, governance, observability, and API edge hardening.
 
@@ -10,9 +10,9 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 
 ## Foundation pillars
 
-| Bounded Architecture | Operational Readiness | Disciplined Delivery |
+| Architecture | Readiness | Delivery |
 | --- | --- | --- |
-| Modules own their domain concepts end to end. Dependency boundaries are explicit, provider integrations sit behind ports, and architecture rules are enforced mechanically. | Runtime concerns are built in from the start: typed settings, structured errors, request correlation, health probes, structured logging, tracing hooks, and sanitized failure paths. | Work is decomposed into small, reviewable tasks with explicit scope, acceptance criteria, implementation patterns, and stop conditions. |
+| Modules own their domain concepts end to end. Application code depends on ports, provider code sits behind adapters, and import rules are enforced mechanically. | Runtime concerns are part of the foundation: typed settings, structured errors, request correlation, health probes, structured logging, tracing hooks, and sanitized failure paths. | Work is split into small tasks with allowed files, forbidden changes, acceptance criteria, stop conditions, and review checklists. |
 
 ---
 
@@ -26,37 +26,36 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 - **Structured logging** with `structlog`
 - **Health, readiness, and liveness probes**
 - **Security headers and pagination utilities**
-- **Platform ports** for storage, cache, queue, and future cross-cutting capabilities
+- **Platform ports** for storage, cache, queue, rate limiting, idempotency, and future cross-cutting capabilities
 - **Pragmatic ports-and-adapters architecture** for provider replacement
 - **Layered application core** with explicit infrastructure adapter boundaries
-- **AI-ready slices** for LLMs, embeddings, prompts, documents, RAG, and governance
+- **Runtime wiring container** for resources, adapters, and use-case assembly
 - **Task-driven implementation workflow** with specifications, review contracts, and implementation patterns
 
 ---
 
 ## Current status
 
-Phase 2 implementation is in progress.
+| Area | Status |
+| --- |------|
+| Python 3.13 tooling with `uv` | Done |
+| Ruff, Mypy, Pytest, coverage, pre-commit, and Makefile workflows | Done |
+| Docker/local development stack | Done |
+| Import-boundary contracts | Done |
+| Shared primitives and application error hierarchy | Done |
+| RFC 9457 Problem Details | Done |
+| Typed settings | Done |
+| Observability primitives | Done |
+| App composition root, lifespan, and wiring boundary | Done |
+| API exception handling | Done |
+| Security headers and pagination | Done |
+| Health/readiness/liveness infrastructure | Done |
+| Platform ports and initial infrastructure adapters | Done |
+| Auth and users | In progress |
+| Prompt registry | Next |
+| Documents, ingestion, embeddings, vector store, RAG, citations, governance | Planned |
 
-The foundation layer currently includes:
-
-- Python 3.13 project tooling with `uv`
-- Ruff, Mypy, Pytest, coverage, pre-commit, and Makefile workflows
-- Docker and local development stack
-- CI workflow scaffold
-- import-boundary contracts
-- shared primitives and application error hierarchy
-- Problem Details error model
-- typed settings
-- observability primitives
-- app composition root
-- API exception handling
-- security headers and pagination
-- health/readiness/liveness infrastructure
-- initial platform ports
-- initial infrastructure foundations
-
-The remaining Phase 2 work completes the golden-path product slice:
+The core foundation is in place and the product-oriented AI slices are being added incrementally, while the next product slice builds toward:
 
 ```text
 documents → ingestion job → embeddings → vector store → RAG answer with citations
@@ -66,30 +65,9 @@ documents → ingestion job → embeddings → vector store → RAG answer with 
 
 ## Architecture model
 
-This project uses a pragmatic **ports-and-adapters** architecture with a layered application core.
+This project uses pragmatic **ports and adapters** with a layered application core.
 
-In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters. The repository makes the concrete dependency rules explicit so the architecture can be enforced mechanically rather than treated as convention. The goal is simple: application code depends on stable ports, provider-specific code lives behind adapters, and runtime composition happens in approved wiring surfaces.
-
-The architecture has three main parts:
-
-1. **Layered application core**
-    - `app.main`
-    - `app.api`
-    - `app.core`
-    - domain modules such as `app.documents`, `app.rag`, `app.ai`, and `app.ai_governance`
-    - capability modules such as `app.llm`, `app.embeddings`, and `app.prompts`
-    - platform ports such as storage, cache, queue, rate limiting, and idempotency
-    - shared primitives and observability support
-
-2. **Outer driven-adapter ring**
-    - `app.infrastructure.*`
-    - concrete adapters for Postgres, Redis, storage, queues, HTTP clients, LLM providers, embedding providers, vector stores, and similar runtime integrations
-    - adapters import the ports they implement
-
-3. **Composition surface**
-    - `app.core.wiring.*`
-    - the approved place for resource wiring, adapter wiring, and use-case wiring
-    - the only place where concrete infrastructure adapters are bound into application workflows
+In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters. The repository makes the concrete dependency rules explicit so the architecture can be enforced mechanically instead of relying on convention.
 
 The core rule is:
 
@@ -108,7 +86,48 @@ Use cases are assembled by wiring.
 API handlers receive already-wired application objects.
 ```
 
-FastAPI dependency injection is used at the API edge, but it is not the application’s composition model. API dependencies may retrieve already-wired use cases or request-scoped edge concerns; they must not manually construct Redis, database, OpenAI, storage, queue, or vector-store adapters.
+FastAPI dependency injection is used at the API edge, but it is not the application composition model. API dependencies may retrieve already-wired use cases or request-scoped edge concerns. They must not manually construct Redis, database, OpenAI, storage, queue, vector-store, or other infrastructure adapters.
+
+The architecture has three main parts.
+
+### 1. Layered application core
+
+```text
+app.main
+app.api
+app.core
+app.auth
+app.users
+app.documents
+app.rag
+app.llm
+app.embeddings
+app.prompts
+app.ai_governance
+app.platform
+app.shared
+app.observability
+```
+
+Application and capability modules own their ports locally. There is no global `app.ports` package.
+
+### 2. Outer driven-adapter ring
+
+```text
+app.infrastructure.*
+```
+
+Infrastructure modules contain concrete driven adapters: Postgres, Redis, storage, queues, HTTP clients, LLM providers, embedding providers, vector stores, and similar runtime integrations.
+
+Infrastructure adapters may import the ports they implement. They must not import application composition code or unrelated infrastructure adapters.
+
+### 3. Composition surface
+
+```text
+app.core.wiring.*
+```
+
+Wiring modules create resources, instantiate adapters, and assemble use cases. This is the approved place for binding concrete infrastructure into application workflows.
 
 Practical dependency shape:
 
@@ -127,7 +146,7 @@ Concrete adapters are selected only by:
 app.core.wiring.* → app.infrastructure.*
 ```
 
-This means the following is valid:
+Valid examples:
 
 ```text
 app.infrastructure.redis.cache -> app.platform.cache.ports
@@ -137,7 +156,7 @@ app.infrastructure.vector_stores.pgvector -> app.rag.ports
 app.core.wiring.cache -> app.infrastructure.redis.cache
 ```
 
-And the following is forbidden:
+Forbidden examples:
 
 ```text
 app.api.* -> app.infrastructure.*
@@ -147,9 +166,9 @@ app.platform.* -> app.infrastructure.*
 app.infrastructure.redis.* -> app.infrastructure.storage.*
 ```
 
-For Phase 2, `app.infrastructure` is the only modeled outer adapter ring for **driven adapters**: technical integrations the application calls outward. Entrypoints and delivery mechanisms such as `app.main`, `app.api`, and future `app.worker` are modeled separately as application edge modules. They are not placed under `app.infrastructure`.
+Entrypoints and delivery mechanisms such as `app.main`, `app.api`, and a future `app.worker` are application edge modules. They are not placed under `app.infrastructure`, which is reserved for driven adapters the application calls outward.
 
-Import boundaries are mechanically enforced with Import Linter. If a task conflicts with those boundaries, implementation stops and the specification or architecture is corrected before code continues.
+Import boundaries are enforced with Import Linter. If a task conflicts with those boundaries, implementation stops and the task spec or architecture docs are corrected before code continues.
 
 See:
 
@@ -168,7 +187,7 @@ See:
 app/
   main/              # ASGI entrypoint and app creation
   api/               # API edge: errors, routers, pagination, security headers
-  core/              # settings, container, DI, lifespan, wiring
+  core/              # settings, container, lifespan, wiring
   shared/            # shared primitives, application errors, Problem Details
   observability/     # logging, correlation, health, tracing, metrics
   platform/          # cross-cutting ports: storage, cache, queue, etc.
@@ -184,7 +203,7 @@ app/
   ai_governance/     # budgets, policy, audit, governance checks
 ```
 
-The structure avoids generic technical buckets such as `models/`, `schemas/`, `services`, and `routers`. Modules own their domain concepts end to end.
+The structure avoids broad technical buckets such as `models/`, `schemas/`, `services`, and `routers`. Modules own their concepts end to end.
 
 ---
 
@@ -210,9 +229,7 @@ Each task defines:
 - common failure modes
 - review checklist
 
-This keeps work small, explicit, and reviewable. Complex systems are built more safely when each change has a narrow scope, clear inputs, and a defined acceptance boundary.
-
-The workflow:
+The workflow is intentionally strict:
 
 ```text
 task spec
@@ -228,13 +245,15 @@ re-review
 commit
 ```
 
-If a task conflicts with the architecture, implementation stops and the specification is corrected first. The process favors architectural integrity over workarounds.
+If a task needs files outside its allowed list, implementation stops. The task spec is patched first, reviewed, and committed separately when appropriate. The project does not rely on hard-coded shortcuts or boundary workarounds to make tests pass.
+
+This keeps changes small enough to review and concrete enough to test.
 
 ---
 
 ## AI-assisted development process
 
-The repository includes operating procedures for AI-assisted development:
+The repository includes operating procedures for AI-assisted implementation and review:
 
 ```text
 docs/ai/
@@ -244,15 +263,7 @@ docs/ai/
   architect.md
 ```
 
-These documents define how implementation and review agents should:
-
-- implement one task at a time
-- respect allowed-file boundaries
-- stop on contradictions
-- apply review findings
-- produce deterministic review reports
-- avoid speculative future work
-- preserve dependency boundaries
+These documents are not a substitute for engineering judgment. They define guardrails for using AI agents on bounded tasks: respect allowed files, stop on contradictions, preserve dependency boundaries, and produce deterministic review reports.
 
 Implementation patterns are captured in:
 
@@ -308,7 +319,7 @@ The API edge is designed to be predictable and safe:
 
 ## Observability
 
-Observability is part of the foundation.
+Observability is part of the foundation, not a later add-on.
 
 Implemented and planned observability primitives include:
 
@@ -325,7 +336,7 @@ The design keeps observability reusable without letting it dominate business mod
 
 ## AI platform roadmap
 
-Phase 2 builds toward an end-to-end AI workflow:
+The platform is being built toward an end-to-end AI workflow:
 
 1. document upload
 2. blob storage
@@ -340,7 +351,7 @@ Phase 2 builds toward an end-to-end AI workflow:
 11. citations
 12. audit trail
 
-The platform is structured so providers can be replaced without rewriting product logic.
+Provider-specific code is kept behind ports so concrete providers can be replaced without rewriting product logic.
 
 Planned adapter surfaces include:
 
@@ -375,7 +386,7 @@ Product-specific features, UI concerns, billing, tenant management, and business
 
 ## Important documents
 
-Read in this order:
+Read in order:
 
 1. [`AGENTS.md`](AGENTS.md)
 2. [`docs/architecture.md`](docs/architecture.md)
@@ -392,10 +403,10 @@ Read in this order:
 
 ## Design philosophy
 
-AI systems should be engineered like long-lived software systems from day one.
+AI systems should be built like long-lived software systems from the start.
 
 That means clear boundaries, explicit contracts, replaceable adapters, observable runtime behavior, typed configuration, testable modules, and a process that prevents architectural drift.
 
-The same principle applies to the way the repository is built. Large ambiguous requests are broken into small, inspectable tasks. Each task has defined inputs, allowed files, acceptance criteria, review rules, and quality gates.
+The same standard applies to the repository itself. Large ambiguous changes are broken into small, inspectable tasks. Each task has defined inputs, allowed files, acceptance criteria, review rules, and quality gates.
 
 Strictness is intentional. It makes future features cheaper, reviews clearer, integrations safer, and AI-assisted development more reliable.
