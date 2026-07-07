@@ -94,9 +94,9 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 
 ## S08 — Persistence + migrations
 
-- [ ] **T-801** — Alembic init (async) — `env.py` on the async engine, reading `DATABASE_URL` via `core.config`, collecting `Base.metadata`.
-- [ ] **T-802** — Initial migration (pgvector + base) — `CREATE EXTENSION IF NOT EXISTS vector`; no domain tables in this revision.
-- [ ] **T-803** — DB session + pgvector round-trip integration test — Testcontainers Postgres proving `Vector(3)` insert/select round-trips.
+- [x] **T-801** — Alembic init (async) — `env.py` on the async engine, reading `DATABASE_URL` via `core.config`, collecting `Base.metadata`.
+- [x] **T-802** — Initial migration (pgvector + base) — `CREATE EXTENSION IF NOT EXISTS vector`; no domain tables in this revision.
+- [x] **T-803** — DB session + pgvector round-trip integration test — Testcontainers Postgres proving `Vector(3)` insert/select round-trips.
 
 ## S09 — Auth + Users
 
