@@ -159,10 +159,11 @@ Every row links to the self-contained task file under [`docs/implementation/task
 | [T-907](docs/implementation/tasks/T-907.md) | S09                              | `app/auth/api.py` (register/login/refresh/logout)                  | M    |
 | [T-908](docs/implementation/tasks/T-908.md) | S09                              | Auth API tests + refresh-reuse detection test                      | M    |
 | [T-910](docs/implementation/tasks/T-910.md) | S09 Users                        | `app/users/{domain,persistence,service,api,deps}.py` GET /users/me | M    |
-| [T-1001](docs/implementation/tasks/T-1001.md) | S10 Prompts                      | `app/prompts/{domain,ports,registry}.py` + `__init__.py`           | M    |
-| [T-1002](docs/implementation/tasks/T-1002.md) | S10                              | `app/prompts/library/rag_answer_v1.yaml` + IO schemas              | M    |
-| [T-1003](docs/implementation/tasks/T-1003.md) | S10                              | `app/prompts/api.py` (read-only inspection)                        | M    |
-| [T-1004](docs/implementation/tasks/T-1004.md) | S10                              | Prompt registry render + schema-validation tests                   | M    |
+| [T-911](docs/implementation/tasks/T-911.md) | S09                              | Scope-based authorization dependency                               | M    |
+| [T-1001](docs/implementation/tasks/T-1001.md) | S10 Prompts                      | `app/prompts` foundation and filesystem registry                   | M    |
+| [T-1002](docs/implementation/tasks/T-1002.md) | S10                              | `app/prompts/library/rag_answer_v1.{yaml,py}`                      | M    |
+| [T-1003](docs/implementation/tasks/T-1003.md) | S10                              | Prompt registry runtime wiring and API-edge dependency             | M    |
+| [T-1004](docs/implementation/tasks/T-1004.md) | S10                              | Prompt inspection API and shipped prompt verification              | M    |
 | [T-1100](docs/implementation/tasks/T-1100.md) | S11 LLM + embeddings ports       | `app/ai_governance/{domain,ports}.py` (pre-llm interface only)     | M    |
 | [T-1101](docs/implementation/tasks/T-1101.md) | S11                              | `app/llm/{domain,ports,observability,router}.py`                   | M    |
 | [T-1102](docs/implementation/tasks/T-1102.md) | S11                              | `app/llm/service.py` (governance gate + observation)               | M    |

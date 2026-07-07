@@ -115,6 +115,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 - [x] **T-908** — Auth API tests + refresh-reuse detection — Happy path, 401/422, Problem Details, `X-Request-ID`, and family revocation on reuse.
 - [x] **T-906C** — Propagate email through authenticated principal — Add `email` to the public authenticated principal returned by `get_current_user`, so downstream modules like `app.users` can use the authenticated user's email without importing auth persistence, auth adapters, or decoding JWTs.
 - [x] **T-910** — `app/users/` minimal — `User` profile, `GET /api/v1/users/me`, and lazy `get_or_create_profile` on first read.
+- [ ] **T-911** — Scope-based authorization dependency — Add a reusable API-edge authorization dependency factory.
 
 ## S10 — Prompts
 
