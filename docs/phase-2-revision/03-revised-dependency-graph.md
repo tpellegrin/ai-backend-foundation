@@ -169,6 +169,7 @@ used to hide the composition edge from static analysis are forbidden. See
 | `TaskQueue` | **`app.platform.queue.ports`** | `app.documents`, `app.rag`, `app.ai` | `app.infrastructure.queue.arq` |
 | `RateLimiter` | **`app.platform.rate_limit.ports`** | `app.api` | `app.infrastructure.rate_limit.redis` |
 | `IdempotencyStore` | **`app.platform.idempotency.ports`** | `app.api` | `app.infrastructure.idempotency.redis` |
+| `Base`, `Vector` | **`app.platform.db`** | `app.*.persistence`, `app.infrastructure.db` | (mapping foundation) |
 | `UsageRepository` | `app.ai_governance.ports` | `app.ai_governance.service` | `app.ai_governance.persistence` |
 | `BudgetPolicyStore` | `app.ai_governance.ports` | `app.ai_governance.service` | `app.ai_governance.persistence` |
 | `IdentityProvider` | `app.auth.ports` | `app.auth` | `app.auth.adapters.*` |

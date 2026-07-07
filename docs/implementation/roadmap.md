@@ -104,6 +104,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 - [x] **T-902** — `app/auth/ports.py` — `PasswordHasher`, `TokenSigner`, and `IdentityProvider` protocols.
 - [ ] **T-903** — `app/auth/adapters/argon2_hasher.py` — Argon2id hasher with rehash detection and no leaked provider exceptions.
 - [x] **T-904** — `app/auth/adapters/jwt_signer.py` — RS256/EdDSA JWT signer with standard claims and 30s clock skew.
+- [x] **T-904A** — Establish platform SQLAlchemy mapping foundation — Move shared `Base`/metadata to `app.platform.db` to unblock feature-module persistence.
 - [ ] **T-905** — `app/auth/persistence.py` + migration — `UserRow` and `RefreshTokenRow` mapped classes translated to domain types at the boundary.
 - [ ] **T-906** — `app/auth/service.py` + `policies.py` + `deps.py` — `register/login/refresh/logout` service with refresh-token rotation and reuse detection.
 - [ ] **T-907** — `app/auth/api.py` — `/auth/register|login|refresh|logout` endpoints raising only `AppError` subclasses.

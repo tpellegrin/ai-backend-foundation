@@ -8,9 +8,9 @@ from testcontainers.postgres import (  # type: ignore[import-untyped]  # missing
 )
 
 from app.core.config.settings import AppSettings
-from app.infrastructure.db.base import Base
 from app.infrastructure.db.engine import create_engine_from, create_session_factory
-from app.infrastructure.db.types import Vector
+from app.platform.db.base import Base
+from app.platform.db.types import Vector
 
 
 @pytest.fixture(scope="module")

@@ -5,7 +5,7 @@ from sqlalchemy import Column, Integer, MetaData, Table, insert, select, text
 from testcontainers.postgres import PostgresContainer  # type: ignore[import-untyped]
 
 from app.infrastructure.db.engine import create_engine_from, create_session_factory
-from app.infrastructure.db.types import Vector
+from app.platform.db.types import Vector
 
 
 class MockSettings:
