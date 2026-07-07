@@ -58,7 +58,6 @@ uv sync --all-groups
 Run the core checks:
 
 ```bash
-uv sync --all-groups
 make fmt
 make lint
 make typecheck
