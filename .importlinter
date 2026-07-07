@@ -25,6 +25,9 @@ layers =
     app.platform
     app.observability
     app.shared
+ignore_imports =
+    app.users.api -> app.auth.deps
+    app.users.api -> app.auth.domain
 
 [importlinter:contract:capabilities-independent]
 name = Capabilities are independent
