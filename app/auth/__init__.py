@@ -5,6 +5,8 @@ from app.auth.domain import (
     InvalidCredentialsError,
     RefreshReuseDetectedError,
     RefreshToken,
+    RefreshTokenRecord,
+    UserAuthRecord,
 )
 from app.auth.ports import IdentityProvider, PasswordHasher, TokenSigner
 
@@ -17,5 +19,7 @@ __all__ = [
     "PasswordHasher",
     "RefreshReuseDetectedError",
     "RefreshToken",
+    "RefreshTokenRecord",
     "TokenSigner",
+    "UserAuthRecord",
 ]
