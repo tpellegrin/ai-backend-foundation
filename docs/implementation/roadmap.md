@@ -102,11 +102,13 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 
 - [x] **T-901** — `app/auth/domain.py` — Frozen `Credentials`, `AuthenticatedUser`, `AccessToken`, `RefreshToken`, and auth-specific errors.
 - [x] **T-902** — `app/auth/ports.py` — `PasswordHasher`, `TokenSigner`, and `IdentityProvider` protocols.
-- [ ] **T-903** — `app/auth/adapters/argon2_hasher.py` — Argon2id hasher with rehash detection and no leaked provider exceptions.
+- [x] **T-903** — `app/auth/adapters/argon2_hasher.py` — Argon2id hasher with configurable settings, `needs_rehash`, and no leaked provider exceptions.
 - [x] **T-904** — `app/auth/adapters/jwt_signer.py` — RS256/EdDSA JWT signer with standard claims and 30s clock skew.
 - [x] **T-904A** — Establish platform SQLAlchemy mapping foundation — Move shared `Base`/metadata to `app.platform.db` to unblock feature-module persistence.
-- [ ] **T-905** — `app/auth/persistence.py` + migration — `UserRow` and `RefreshTokenRow` mapped classes translated to domain types at the boundary.
-- [ ] **T-906** — `app/auth/service.py` + `policies.py` + `deps.py` — `register/login/refresh/logout` service with refresh-token rotation and reuse detection.
+- [x] **T-905** — `app/auth/persistence.py` + migration — `UserRow` and `RefreshTokenRow` mapped classes translated to auth domain/read-model types at the boundary.
+- [ ] **T-905A** — Refresh-token persistence mutation helpers — Add rotation, single-token revocation, and family revocation helpers returning auth domain/read-model records.
+- [ ] **T-906A** — Auth runtime wiring — Wire `PasswordHasher` and `TokenSigner` into the `Container` through `app/core/wiring/auth.py`.
+- [ ] **T-906** — Auth service + policies + deps — `register/login/refresh/logout` service with refresh-token rotation and reuse detection.
 - [ ] **T-907** — `app/auth/api.py` — `/auth/register|login|refresh|logout` endpoints raising only `AppError` subclasses.
 - [ ] **T-908** — Auth API tests + refresh-reuse detection — Happy path, 401/422, Problem Details, `X-Request-ID`, and family revocation on reuse.
 - [ ] **T-910** — `app/users/` minimal — `User` profile, `GET /api/v1/users/me`, and lazy `get_or_create_profile` on first read.
