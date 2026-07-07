@@ -6,7 +6,7 @@ import pytest
 from fastapi import Request
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.auth.deps import get_auth_service, get_current_user
+from app.auth.deps import get_auth_service, get_clock, get_current_user
 from app.auth.domain import AuthenticatedUser
 from app.shared.errors import AuthenticationError
 
@@ -16,6 +16,7 @@ def mock_container() -> MagicMock:
     container = MagicMock()
     container.password_hasher = MagicMock()
     container.token_signer = MagicMock()
+    container.clock = MagicMock()
     container.settings = MagicMock()
     container.settings.jwt.access_ttl_seconds = 900
     container.settings.jwt.refresh_ttl_seconds = 60 * 60 * 24 * 7
@@ -36,8 +37,15 @@ async def test_get_auth_service(mock_request: MagicMock, mock_container: MagicMo
     assert service._session == session
     assert service._password_hasher == mock_container.password_hasher
     assert service._token_signer == mock_container.token_signer
+    assert service._clock == mock_container.clock
     assert service._access_token_expires_minutes == 15  # noqa: PLR2004
     assert service._refresh_token_expires_days == 7  # noqa: PLR2004
+
+
+@pytest.mark.unit
+async def test_get_clock(mock_request: MagicMock, mock_container: MagicMock) -> None:
+    clock = await get_clock(mock_request)
+    assert clock == mock_container.clock
 
 
 @pytest.mark.unit

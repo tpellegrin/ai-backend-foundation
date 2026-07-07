@@ -1,12 +1,12 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 
-from app.auth.deps import get_auth_service
+from app.auth.deps import get_auth_service, get_clock
 from app.auth.domain import Credentials
 from app.auth.service import AuthService
+from app.shared.clock import Clock
 from app.shared.problem_details import ProblemDetails
 
 router = APIRouter()
@@ -86,14 +86,13 @@ async def register(
 async def login(
     request: LoginRequest,
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    clock: Annotated[Clock, Depends(get_clock)],
 ) -> TokenResponse:
     """Authenticate a user and issue tokens."""
     creds = Credentials(username=request.username, password=request.password)
     access_token, refresh_token = await auth_service.login(creds)
 
-    # TODO: [T-908] Use app/shared/clock.py for expires_in calculation
-    now = datetime.now(UTC)
-    expires_in = int((access_token.expires_at - now).total_seconds())
+    expires_in = int((access_token.expires_at - clock.now()).total_seconds())
 
     return TokenResponse(
         access_token=access_token.token,
@@ -113,13 +112,12 @@ async def login(
 async def refresh(
     request: RefreshRequest,
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    clock: Annotated[Clock, Depends(get_clock)],
 ) -> TokenResponse:
     """Rotate a refresh token."""
     access_token, refresh_token = await auth_service.refresh(request.refresh_token)
 
-    # TODO: [T-908] Use app/shared/clock.py for expires_in calculation
-    now = datetime.now(UTC)
-    expires_in = int((access_token.expires_at - now).total_seconds())
+    expires_in = int((access_token.expires_at - clock.now()).total_seconds())
 
     return TokenResponse(
         access_token=access_token.token,

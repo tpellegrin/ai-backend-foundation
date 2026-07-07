@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from app.core.container import Container
 from app.core.wiring.auth import setup_password_hasher, setup_token_signer
 from app.core.wiring.cache import RedisProbe, setup_cache, setup_redis_client, shutdown_redis
+from app.core.wiring.clock import wire_clock
 from app.core.wiring.db import DBProbe, setup_db
 from app.core.wiring.storage import setup_storage
 
@@ -59,6 +60,9 @@ async def _on_startup(container: Container) -> None:
     # Auth wiring (T-906A)
     container.password_hasher = setup_password_hasher(container.settings)
     container.token_signer = setup_token_signer(container.settings)
+
+    # Clock wiring (T-907A)
+    container.clock = wire_clock()
 
 
 async def _on_shutdown(container: Container) -> None:

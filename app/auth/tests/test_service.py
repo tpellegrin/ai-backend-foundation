@@ -13,6 +13,7 @@ from app.auth.domain import (
     UserAuthRecord,
 )
 from app.auth.service import AuthService
+from app.shared.clock import FixedClock
 from app.shared.errors import AuthenticationError, ConflictError
 from app.shared.types import TenantId, UserId
 
@@ -39,8 +40,18 @@ def mock_signer() -> MagicMock:
 
 
 @pytest.fixture
-def service(mock_session: AsyncMock, mock_hasher: MagicMock, mock_signer: MagicMock) -> AuthService:
-    return AuthService(mock_session, mock_hasher, mock_signer)
+def mock_clock() -> FixedClock:
+    return FixedClock(datetime(2025, 1, 1, tzinfo=UTC))
+
+
+@pytest.fixture
+def service(
+    mock_session: AsyncMock,
+    mock_hasher: MagicMock,
+    mock_signer: MagicMock,
+    mock_clock: FixedClock,
+) -> AuthService:
+    return AuthService(mock_session, mock_hasher, mock_signer, mock_clock)
 
 
 @pytest.mark.unit
@@ -58,7 +69,7 @@ async def test_register_happy_path(
             id=uuid4(),
             email=email,
             password_hash=mock_hasher.hash(password),
-            created_at=datetime.now(UTC),
+            created_at=service._clock.now(),
             tenant_id=None,
             disabled=False,
         )
@@ -81,7 +92,7 @@ async def test_register_conflict(service: AuthService) -> None:
             id=uuid4(),
             email=email,
             password_hash="hash",
-            created_at=datetime.now(UTC),
+            created_at=service._clock.now(),
             tenant_id=None,
             disabled=False,
         )
@@ -102,7 +113,7 @@ async def test_login_happy_path(
         id=user_id,
         email=email,
         password_hash=mock_hasher.hash(password),
-        created_at=datetime.now(UTC),
+        created_at=service._clock.now(),
         tenant_id=None,
         disabled=False,
     )
@@ -134,7 +145,7 @@ async def test_login_disabled_user(service: AuthService, mock_hasher: MagicMock)
         id=uuid4(),
         email=email,
         password_hash=mock_hasher.hash("password"),
-        created_at=datetime.now(UTC),
+        created_at=service._clock.now(),
         tenant_id=None,
         disabled=True,
     )
@@ -159,8 +170,8 @@ async def test_refresh_rotation_happy_path(
         user_id=user_id,
         family_id=family_id,
         hash="hashed-old-token",
-        issued_at=datetime.now(UTC) - timedelta(hours=1),
-        expires_at=datetime.now(UTC) + timedelta(days=1),
+        issued_at=service._clock.now() - timedelta(hours=1),
+        expires_at=service._clock.now() + timedelta(days=1),
         revoked_at=None,
         replaced_by=None,
     )
@@ -169,7 +180,7 @@ async def test_refresh_rotation_happy_path(
         id=user_id,
         email="test@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=service._clock.now(),
         tenant_id=None,
         disabled=False,
     )
@@ -205,9 +216,9 @@ async def test_refresh_reuse_detection(
         user_id=uuid4(),
         family_id=family_id,
         hash="hashed-reused-token",
-        issued_at=datetime.now(UTC) - timedelta(hours=2),
-        expires_at=datetime.now(UTC) + timedelta(days=1),
-        revoked_at=datetime.now(UTC) - timedelta(hours=1),
+        issued_at=service._clock.now() - timedelta(hours=2),
+        expires_at=service._clock.now() + timedelta(days=1),
+        revoked_at=service._clock.now() - timedelta(hours=1),
         replaced_by=uuid4(),
     )
 
@@ -242,7 +253,7 @@ async def test_login_wrong_password(service: AuthService, mock_hasher: MagicMock
         id=uuid4(),
         email=email,
         password_hash=mock_hasher.hash("correct-password"),
-        created_at=datetime.now(UTC),
+        created_at=service._clock.now(),
         tenant_id=None,
         disabled=False,
     )
@@ -281,8 +292,8 @@ async def test_refresh_token_hash_mismatch(
         user_id=uuid4(),
         family_id=uuid4(),
         hash="mismatched-hash",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC) + timedelta(days=1),
+        issued_at=service._clock.now(),
+        expires_at=service._clock.now() + timedelta(days=1),
         revoked_at=None,
         replaced_by=None,
     )
@@ -314,9 +325,9 @@ async def test_refresh_revoked_but_not_reused(
         user_id=uuid4(),
         family_id=uuid4(),
         hash="hashed-revoked-token",
-        issued_at=datetime.now(UTC) - timedelta(hours=2),
-        expires_at=datetime.now(UTC) + timedelta(days=1),
-        revoked_at=datetime.now(UTC) - timedelta(hours=1),
+        issued_at=service._clock.now() - timedelta(hours=2),
+        expires_at=service._clock.now() + timedelta(days=1),
+        revoked_at=service._clock.now() - timedelta(hours=1),
         replaced_by=None,  # Not replaced, just revoked (e.g. logout)
     )
 
@@ -339,8 +350,8 @@ async def test_refresh_user_disabled(
         user_id=user_id,
         family_id=uuid4(),
         hash="hashed-token-for-disabled-user",
-        issued_at=datetime.now(UTC) - timedelta(hours=1),
-        expires_at=datetime.now(UTC) + timedelta(days=1),
+        issued_at=service._clock.now() - timedelta(hours=1),
+        expires_at=service._clock.now() + timedelta(days=1),
         revoked_at=None,
         replaced_by=None,
     )
@@ -349,7 +360,7 @@ async def test_refresh_user_disabled(
         id=user_id,
         email="test@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=service._clock.now(),
         tenant_id=None,
         disabled=True,
     )
@@ -405,3 +416,60 @@ async def test_logout_happy_path(service: AuthService, mock_signer: MagicMock) -
     with patch("app.auth.persistence.revoke_refresh_token") as mock_revoke:
         await service.logout("valid-token")
         mock_revoke.assert_called_once()
+
+
+@pytest.mark.unit
+async def test_refresh_rotation_order(
+    service: AuthService, mock_signer: MagicMock, mock_hasher: MagicMock
+) -> None:
+    """Verify that the new token is inserted BEFORE the old one is marked as replaced.
+    This prevents FK violations where replaced_by points to a non-existent token.
+    """
+    token_id = uuid4()
+    user_id = uuid4()
+    family_id = uuid4()
+
+    mock_signer.verify.return_value = {"jti": str(token_id), "typ": "refresh"}
+
+    token_record = RefreshTokenRecord(
+        id=token_id,
+        user_id=user_id,
+        family_id=family_id,
+        hash="hashed-old-token",
+        issued_at=service._clock.now() - timedelta(hours=1),
+        expires_at=service._clock.now() + timedelta(days=1),
+        revoked_at=None,
+        replaced_by=None,
+    )
+
+    user_record = UserAuthRecord(
+        id=user_id,
+        email="test@example.com",
+        password_hash="hash",
+        created_at=service._clock.now(),
+        tenant_id=None,
+        disabled=False,
+    )
+
+    # We want to track call order across multiple mocks
+    manager = MagicMock()
+
+    with (
+        patch("app.auth.persistence.get_refresh_token_by_id", return_value=token_record),
+        patch("app.auth.persistence.get_user_by_id", return_value=user_record),
+        patch("app.auth.persistence.mark_refresh_token_replaced") as mock_replace,
+        patch("app.auth.persistence.insert_refresh_token") as mock_insert,
+    ):
+        manager.attach_mock(mock_replace, "mark_replaced")
+        manager.attach_mock(mock_insert, "insert_token")
+
+        mock_hasher.verify.return_value = True
+
+        await service.refresh("old-token")
+
+        # Verify call order: insert_token must be before mark_replaced
+        # manager.mock_calls shows all calls to attached mocks
+        call_names = [call[0] for call in manager.mock_calls]
+        assert "insert_token" in call_names
+        assert "mark_replaced" in call_names
+        assert call_names.index("insert_token") < call_names.index("mark_replaced")

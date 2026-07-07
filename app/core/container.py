@@ -7,6 +7,7 @@ from app.core.config.settings import AppSettings
 from app.observability.health import ProbeRegistry
 from app.platform.cache.ports import Cache
 from app.platform.storage.ports import BlobStorage
+from app.shared.clock import Clock
 
 
 @dataclass
@@ -25,3 +26,4 @@ class Container:
     cache: Cache | None = None
     password_hasher: PasswordHasher | None = None
     token_signer: TokenSigner | None = None
+    clock: Clock | None = None

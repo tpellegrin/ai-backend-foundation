@@ -10,6 +10,7 @@ from app.auth.domain import AuthenticatedUser
 from app.auth.policies import require_active_user, require_authenticated
 from app.auth.service import AuthService
 from app.observability.logging import get_logger
+from app.shared.clock import Clock
 from app.shared.errors import AppError, AuthenticationError
 from app.shared.types import TenantId, UserId
 
@@ -61,13 +62,39 @@ async def get_auth_service(
             detail="TokenSigner not wired in container",
         )
 
+    clock = container.clock
+    if clock is None:
+        logger.error("clock_missing")
+        raise AppError(
+            code="wiring-error",
+            title="Clock not wired",
+            status=500,
+            detail="Clock not wired in container",
+        )
+
     return AuthService(
         session=session,
         password_hasher=password_hasher,
         token_signer=token_signer,
+        clock=clock,
         access_token_expires_minutes=settings.jwt.access_ttl_seconds // 60,
         refresh_token_expires_days=settings.jwt.refresh_ttl_seconds // (60 * 60 * 24),
     )
+
+
+async def get_clock(request: Request) -> Clock:
+    """Dependency provider for Clock."""
+    container: Any = request.app.state.container
+    clock: Clock | None = container.clock
+    if clock is None:
+        logger.error("clock_missing")
+        raise AppError(
+            code="wiring-error",
+            title="Clock not wired",
+            status=500,
+            detail="Clock not wired in container",
+        )
+    return clock
 
 
 async def get_current_user(

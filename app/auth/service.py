@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -17,6 +17,7 @@ from app.auth.domain import (
 )
 from app.auth.ports import PasswordHasher, TokenSigner
 from app.observability.logging import get_logger
+from app.shared.clock import Clock
 from app.shared.errors import AuthenticationError, ConflictError
 from app.shared.types import TenantId, UserId
 
@@ -26,11 +27,12 @@ logger = get_logger(__name__)
 class AuthService:
     """Orchestrates authentication and user registration."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # Required for dependency injection
         self,
         session: "AsyncSession",
         password_hasher: PasswordHasher,
         token_signer: TokenSigner,
+        clock: Clock,
         *,
         access_token_expires_minutes: int = 15,
         refresh_token_expires_days: int = 7,
@@ -43,6 +45,7 @@ class AuthService:
         self._session = session
         self._password_hasher = password_hasher
         self._token_signer = token_signer
+        self._clock = clock
         self._access_token_expires_minutes = access_token_expires_minutes
         self._refresh_token_expires_days = refresh_token_expires_days
 
@@ -54,7 +57,7 @@ class AuthService:
 
         user_id = uuid4()
         password_hash = self._password_hasher.hash(password)
-        created_at = datetime.now(UTC)
+        created_at = self._clock.now()
 
         user_record = await persistence.insert_user(
             self._session,
@@ -117,7 +120,7 @@ class AuthService:
             await persistence.revoke_refresh_token_family(
                 self._session,
                 family_id=token_record.family_id,
-                revoked_at=datetime.now(UTC),
+                revoked_at=self._clock.now(),
             )
             logger.error(
                 "refresh_token_reuse_detected",
@@ -131,7 +134,7 @@ class AuthService:
             # Already revoked (e.g. via logout) but not replaced
             raise InvalidCredentialsError("Refresh token revoked")  # noqa: TRY003
 
-        if token_record.expires_at < datetime.now(UTC):
+        if token_record.expires_at < self._clock.now():
             raise InvalidCredentialsError("Refresh token expired")  # noqa: TRY003
 
         user = await persistence.get_user_by_id(self._session, token_record.user_id)
@@ -140,7 +143,14 @@ class AuthService:
 
         # Mark old token as replaced
         new_token_id = uuid4()
-        now = datetime.now(UTC)
+        now = self._clock.now()
+
+        # T-907A: Insert the new refresh token before updating the old token's
+        # replaced_by FK to satisfy the DB constraint.
+        tokens = await self._issue_tokens(
+            user, family_id=token_record.family_id, token_id=new_token_id
+        )
+
         await persistence.mark_refresh_token_replaced(
             self._session,
             token_id=token_record.id,
@@ -148,9 +158,7 @@ class AuthService:
             revoked_at=now,
         )
 
-        return await self._issue_tokens(
-            user, family_id=token_record.family_id, token_id=new_token_id
-        )
+        return tokens
 
     async def logout(self, refresh_token_string: str) -> None:
         """Revoke a refresh token."""
@@ -176,7 +184,7 @@ class AuthService:
         await persistence.revoke_refresh_token(
             self._session,
             token_id=token_id,
-            revoked_at=datetime.now(UTC),
+            revoked_at=self._clock.now(),
         )
 
     async def _issue_tokens(
@@ -185,7 +193,7 @@ class AuthService:
         family_id: UUID | None = None,
         token_id: UUID | None = None,
     ) -> tuple[AccessToken, RefreshToken]:
-        now = datetime.now(UTC)
+        now = self._clock.now()
         access_expires = now + timedelta(minutes=self._access_token_expires_minutes)
         refresh_expires = now + timedelta(days=self._refresh_token_expires_days)
 

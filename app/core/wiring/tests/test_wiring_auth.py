@@ -126,6 +126,7 @@ async def test_on_startup_populates_auth(
 
     assert container.password_hasher is not None
     assert container.token_signer is not None
+    assert container.clock is not None
     assert isinstance(container.password_hasher, PasswordHasher)
     assert isinstance(container.token_signer, TokenSigner)
 
@@ -161,6 +162,7 @@ async def test_auth_wiring_in_lifespan(
         async with lifespan(app):
             assert container.password_hasher is not None
             assert container.token_signer is not None
+            assert container.clock is not None
             assert isinstance(container.password_hasher, PasswordHasher)
             assert isinstance(container.token_signer, TokenSigner)
             assert app.state.ready is True
