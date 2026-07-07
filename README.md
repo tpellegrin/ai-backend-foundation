@@ -1,10 +1,10 @@
 # AI Backend Foundation
 
-A production-grade FastAPI backend foundation for AI-native products.
+A FastAPI backend foundation for production-oriented AI-native products.
 
-AI Backend Foundation provides the architecture, runtime structure, and engineering discipline needed to build reliable systems around LLMs, retrieval, document processing, background jobs, governance, observability, and API edge hardening.
+AI Backend Foundation provides the architecture, runtime wiring, and quality gates for building reliable backend systems around LLMs, retrieval, document processing, background jobs, governance, observability, and API edge hardening.
 
-It is designed as a reusable platform substrate: modular enough to adapt, strict enough to scale, and explicit enough to extend safely.
+It is designed as a reusable backend foundation: modular enough to adapt, strict enough to scale, and explicit enough to extend safely.
 
 ---
 
@@ -13,24 +13,6 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 | Architecture | Readiness | Delivery |
 | --- | --- | --- |
 | Modules own their domain concepts end to end. Application code depends on ports, provider code sits behind adapters, and import rules are enforced mechanically. | Runtime concerns are part of the foundation: typed settings, structured errors, request correlation, health probes, structured logging, tracing hooks, and sanitized failure paths. | Work is split into small tasks with allowed files, forbidden changes, acceptance criteria, stop conditions, and review checklists. |
-
----
-
-## What it provides
-
-- **FastAPI application foundation** with explicit app creation, lifespan, and wiring boundaries
-- **Strict module boundaries** enforced by Import Linter
-- **Typed configuration** with Pydantic Settings
-- **RFC 9457 Problem Details** for consistent API errors
-- **Request correlation** with `X-Request-ID`
-- **Structured logging** with `structlog`
-- **Health, readiness, and liveness probes**
-- **Security headers and pagination utilities**
-- **Platform ports** for storage, cache, queue, rate limiting, idempotency, and future cross-cutting capabilities
-- **Pragmatic ports-and-adapters architecture** for provider replacement
-- **Layered application core** with explicit infrastructure adapter boundaries
-- **Runtime wiring container** for resources, adapters, and use-case assembly
-- **Task-driven implementation workflow** with specifications, review contracts, and implementation patterns
 
 ---
 
@@ -55,7 +37,9 @@ It is designed as a reusable platform substrate: modular enough to adapt, strict
 | Prompt registry | Next |
 | Documents, ingestion, embeddings, vector store, RAG, citations, governance | Planned |
 
-The core foundation is in place and the product-oriented AI slices are being added incrementally, while the next product slice builds toward:
+The core backend foundation is in place. Product-oriented AI slices are being added incrementally.
+
+The next product slice builds toward:
 
 ```text
 documents → ingestion job → embeddings → vector store → RAG answer with citations
@@ -63,11 +47,50 @@ documents → ingestion job → embeddings → vector store → RAG answer with 
 
 ---
 
+## Quick start
+
+Install dependencies:
+
+```bash
+uv sync --all-groups
+```
+
+Run the core checks:
+
+```bash
+uv sync --all-groups
+make fmt
+make lint
+make typecheck
+make test
+uv run lint-imports
+```
+
+---
+
+## What it provides
+
+- **FastAPI application foundation** with explicit app creation, lifespan, and wiring boundaries
+- **Strict module boundaries** enforced by Import Linter
+- **Typed configuration** with Pydantic Settings
+- **RFC 9457 Problem Details** for consistent API errors
+- **Request correlation** with `X-Request-ID`
+- **Structured logging** with `structlog`
+- **Health, readiness, and liveness probes**
+- **Security headers and pagination utilities**
+- **Platform ports** for storage, cache, queue, rate limiting, idempotency, and future cross-cutting capabilities
+- **Pragmatic ports-and-adapters architecture** for provider replacement
+- **Layered application core** with explicit infrastructure adapter boundaries
+- **Runtime wiring container** for resources, adapters, and use-case assembly
+- **Task-driven implementation workflow** with specifications, review contracts, and implementation patterns
+
+---
+
 ## Architecture model
 
-This project uses pragmatic **ports and adapters** with a layered application core.
+This project uses pragmatic ports and adapters with a layered application core and explicit runtime wiring.
 
-In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters. The repository makes the concrete dependency rules explicit so the architecture can be enforced mechanically instead of relying on convention.
+In pattern terms, it is closest to Hexagonal Architecture / Ports and Adapters. It is not strict Clean Architecture. The repository makes dependency rules explicit so the architecture can be checked mechanically instead of relying on convention.
 
 The core rule is:
 
@@ -86,7 +109,9 @@ Use cases are assembled by wiring.
 API handlers receive already-wired application objects.
 ```
 
-FastAPI dependency injection is used at the API edge, but it is not the application composition model. API dependencies may retrieve already-wired use cases or request-scoped edge concerns. They must not manually construct Redis, database, OpenAI, storage, queue, vector-store, or other infrastructure adapters.
+FastAPI dependency injection is used at the API edge, but it is not the application composition model.
+
+API dependencies may retrieve already-wired use cases or request-scoped edge concerns. They must not manually construct Redis, database, OpenAI, storage, queue, vector-store, or other infrastructure adapters.
 
 The architecture has three main parts.
 
@@ -109,7 +134,9 @@ app.shared
 app.observability
 ```
 
-Application and capability modules own their ports locally. There is no global `app.ports` package.
+Application and capability modules own their ports locally.
+
+There is no global `app.ports` package.
 
 ### 2. Outer driven-adapter ring
 
@@ -127,7 +154,9 @@ Infrastructure adapters may import the ports they implement. They must not impor
 app.core.wiring.*
 ```
 
-Wiring modules create resources, instantiate adapters, and assemble use cases. This is the approved place for binding concrete infrastructure into application workflows.
+Wiring modules create resources, instantiate adapters, and assemble use cases.
+
+This is the approved place for binding concrete infrastructure into application workflows.
 
 Practical dependency shape:
 
@@ -203,102 +232,9 @@ app/
   ai_governance/     # budgets, policy, audit, governance checks
 ```
 
-The structure avoids broad technical buckets such as `models/`, `schemas/`, `services`, and `routers`. Modules own their concepts end to end.
+The structure avoids broad technical buckets such as `models/`, `schemas/`, `services`, and `routers`.
 
----
-
-## Engineering methodology
-
-Implementation is task-driven.
-
-Each task lives in:
-
-```text
-docs/implementation/tasks/
-```
-
-Each task defines:
-
-- purpose
-- dependencies
-- allowed files
-- forbidden changes
-- implementation requirements
-- tests required
-- acceptance criteria
-- common failure modes
-- review checklist
-
-The workflow is intentionally strict:
-
-```text
-task spec
-  ↓
-implementation
-  ↓
-review against architecture and rules
-  ↓
-patch findings
-  ↓
-re-review
-  ↓
-commit
-```
-
-If a task needs files outside its allowed list, implementation stops. The task spec is patched first, reviewed, and committed separately when appropriate. The project does not rely on hard-coded shortcuts or boundary workarounds to make tests pass.
-
-This keeps changes small enough to review and concrete enough to test.
-
----
-
-## AI-assisted development process
-
-The repository includes operating procedures for AI-assisted implementation and review:
-
-```text
-docs/ai/
-  implement-task.md
-  review-task.md
-  apply-review.md
-  architect.md
-```
-
-These documents are not a substitute for engineering judgment. They define guardrails for using AI agents on bounded tasks: respect allowed files, stop on contradictions, preserve dependency boundaries, and produce deterministic review reports.
-
-Implementation patterns are captured in:
-
-```text
-docs/implementation/patterns.md
-```
-
-The process is based on a simple constraint: AI-assisted work is more reliable when the unit of work is small, the context is explicit, and the expected result is testable. The repository is structured around that constraint.
-
----
-
-## Quality gates
-
-Core checks:
-
-```bash
-uv sync --all-groups
-make fmt
-make lint
-make typecheck
-make test
-uv run lint-imports
-```
-
-The foundation is guarded by:
-
-- Ruff formatting and linting
-- Mypy strict typing
-- Pytest with coverage gate
-- Import Linter contracts
-- pre-commit hooks
-- Docker build validation
-- structured task review
-
-Quality gates are not bypassed. If a gate fails because the task is under-specified, the task is fixed.
+Modules own their concepts end to end.
 
 ---
 
@@ -319,9 +255,9 @@ The API edge is designed to be predictable and safe:
 
 ## Observability
 
-Observability is part of the foundation, not a later add-on.
+The foundation includes observability primitives from the start.
 
-Implemented and planned observability primitives include:
+Implemented and planned observability capabilities include:
 
 - structured JSON logs
 - request correlation
@@ -367,6 +303,94 @@ Implementation progress is tracked in [`docs/implementation/roadmap.md`](docs/im
 
 ---
 
+## Engineering methodology
+
+Implementation is task-driven.
+
+Each task lives in:
+
+```text
+docs/implementation/tasks/
+```
+
+Each task defines:
+
+- purpose
+- dependencies
+- allowed files
+- forbidden changes
+- implementation requirements
+- tests required
+- acceptance criteria
+- common failure modes
+- review checklist
+
+The workflow keeps changes bounded and reviewable:
+
+```text
+task spec
+  ↓
+implementation
+  ↓
+review against architecture and rules
+  ↓
+patch findings
+  ↓
+re-review
+  ↓
+commit
+```
+
+If a task needs files outside its allowed list, implementation stops. The task spec is patched first, reviewed, and committed separately when appropriate. The project does not rely on hard-coded shortcuts or boundary workarounds to make tests pass.
+
+This keeps changes small enough to review and concrete enough to test.
+
+---
+
+## AI-assisted development process
+
+The repository includes operating procedures for AI-assisted implementation and review:
+
+```text
+docs/ai/
+  implement-task.md
+  review-task.md
+  apply-review.md
+  architect.md
+```
+
+These documents are not a substitute for engineering judgment.
+
+They define guardrails for using AI agents on bounded tasks: respect allowed files, stop on contradictions, preserve dependency boundaries, and produce deterministic review reports.
+
+Implementation patterns are captured in:
+
+```text
+docs/implementation/patterns.md
+```
+
+The AI workflow is constrained to the same standards as the rest of the project: small tasks, explicit context, testable outcomes, and reviewable changes.
+
+Those constraints make AI-assisted implementation easier to inspect without making the architecture agent-driven.
+
+---
+
+## Quality gates
+
+The foundation is guarded by:
+
+- Ruff formatting and linting
+- Mypy strict typing
+- Pytest with coverage gate
+- Import Linter contracts
+- pre-commit hooks
+- Docker build validation
+- structured task review
+
+Quality gates are not bypassed. If a gate fails because the task is under-specified, the task is fixed.
+
+---
+
 ## Scope
 
 This repository focuses on the backend foundation required to build AI-native products.
@@ -403,10 +427,10 @@ Read in order:
 
 ## Design philosophy
 
-AI systems should be built like long-lived software systems from the start.
+The design treats AI features as normal long-lived backend capabilities.
 
 That means clear boundaries, explicit contracts, replaceable adapters, observable runtime behavior, typed configuration, testable modules, and a process that prevents architectural drift.
 
-The same standard applies to the repository itself. Large ambiguous changes are broken into small, inspectable tasks. Each task has defined inputs, allowed files, acceptance criteria, review rules, and quality gates.
+The same standard applies to the repository itself: changes should be small, inspectable, tested, and consistent with the dependency rules.
 
-Strictness is intentional. It makes future features cheaper, reviews clearer, integrations safer, and AI-assisted development more reliable.
+The constraints are there to keep future features cheaper, reviews clearer, integrations safer, and AI-assisted development easier to verify.
