@@ -93,7 +93,7 @@ async def test_migration_created_tables(session: AsyncSession, alembic_config: C
 async def test_user_persistence_roundtrip(session: AsyncSession, alembic_config: Config) -> None:
     user_id = uuid.uuid4()
     email = f"test-{user_id}@example.com"
-    now = datetime.now(UTC)
+    now = datetime(2025, 1, 1, tzinfo=UTC)
 
     # 1. Insert
     record = await insert_user(
@@ -129,7 +129,7 @@ async def test_refresh_token_persistence_roundtrip(
         id=user_id,
         email=f"token-user-{user_id}@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
@@ -137,7 +137,7 @@ async def test_refresh_token_persistence_roundtrip(
     token_id = uuid.uuid4()
     family_id = uuid.uuid4()
     token_hash = f"hash-{token_id}"
-    now = datetime.now(UTC)
+    now = datetime(2025, 1, 1, tzinfo=UTC)
     expires = now + timedelta(days=7)
 
     # 1. Insert
@@ -178,7 +178,7 @@ async def test_family_active_uniqueness(session: AsyncSession, alembic_config: C
         id=user_id,
         email=f"family-user-{user_id}@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
@@ -193,8 +193,8 @@ async def test_family_active_uniqueness(session: AsyncSession, alembic_config: C
         user_id=user_id,
         family_id=family_id,
         hash="hash-1",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=None,
     )
@@ -208,8 +208,8 @@ async def test_family_active_uniqueness(session: AsyncSession, alembic_config: C
                 user_id=user_id,
                 family_id=family_id,
                 hash="hash-2",
-                issued_at=datetime.now(UTC),
-                expires_at=datetime.now(UTC),
+                issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+                expires_at=datetime(2025, 1, 8, tzinfo=UTC),
                 revoked_at=None,
                 replaced_by=None,
             )
@@ -230,8 +230,8 @@ async def test_family_active_uniqueness(session: AsyncSession, alembic_config: C
         user_id=user_id,
         family_id=family_id,
         hash="hash-4",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=None,
     )
@@ -253,7 +253,7 @@ async def test_boundary_checks(session: AsyncSession, alembic_config: Config) ->
         id=user_id,
         email=email,
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
@@ -283,14 +283,14 @@ async def test_mark_refresh_token_replaced(session: AsyncSession, alembic_config
         id=user_id,
         email=f"replace-{user_id}@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
 
     token1_id = uuid.uuid4()
     token2_id = uuid.uuid4()
-    revoked_at = datetime.now(UTC)
+    revoked_at = datetime(2025, 1, 1, tzinfo=UTC)
 
     # We must insert token2 first if it is to replace token1 (because of FK)
     # OR we can just use token1_id as replaced_by for testing purposes if FK allows self-ref
@@ -301,8 +301,8 @@ async def test_mark_refresh_token_replaced(session: AsyncSession, alembic_config
         user_id=user_id,
         family_id=uuid.uuid4(),
         hash="hash-2",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=None,
     )
@@ -313,8 +313,8 @@ async def test_mark_refresh_token_replaced(session: AsyncSession, alembic_config
         user_id=user_id,
         family_id=uuid.uuid4(),
         hash="hash-1",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=None,
     )
@@ -348,13 +348,13 @@ async def test_revoke_refresh_token(session: AsyncSession, alembic_config: Confi
         id=user_id,
         email=f"revoke-{user_id}@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
 
     token_id = uuid.uuid4()
-    revoked_at = datetime.now(UTC)
+    revoked_at = datetime(2025, 1, 1, tzinfo=UTC)
 
     await insert_refresh_token(
         session,
@@ -362,8 +362,8 @@ async def test_revoke_refresh_token(session: AsyncSession, alembic_config: Confi
         user_id=user_id,
         family_id=uuid.uuid4(),
         hash="hash-1",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=None,
     )
@@ -394,13 +394,13 @@ async def test_revoke_refresh_token_family(session: AsyncSession, alembic_config
         id=user_id,
         email=f"family-rev-{user_id}@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
 
     family_id = uuid.uuid4()
-    revoked_at = datetime.now(UTC)
+    revoked_at = datetime(2025, 1, 1, tzinfo=UTC)
 
     # Insert 3 tokens in family: t2 replaces t1, t3 is already revoked and replaces t2.
     # We must insert in reverse order of replacement to satisfy FK if we use immediate FKs.
@@ -409,15 +409,15 @@ async def test_revoke_refresh_token_family(session: AsyncSession, alembic_config
     # Let's just insert them with replaced_by=None first and then update, or insert in order.
 
     t3_id = uuid.uuid4()
-    already_revoked_at = datetime.now(UTC) - timedelta(hours=1)
+    already_revoked_at = datetime(2025, 1, 1, tzinfo=UTC) - timedelta(hours=1)
     await insert_refresh_token(
         session,
         id=t3_id,
         user_id=user_id,
         family_id=family_id,
         hash="h3",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 1, tzinfo=UTC),
         revoked_at=already_revoked_at,
         replaced_by=None,
     )
@@ -429,8 +429,8 @@ async def test_revoke_refresh_token_family(session: AsyncSession, alembic_config
         user_id=user_id,
         family_id=family_id,
         hash="h2",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=t3_id,  # t3 replaces t2
     )
@@ -442,8 +442,8 @@ async def test_revoke_refresh_token_family(session: AsyncSession, alembic_config
         user_id=user_id,
         family_id=family_id,
         hash="h1",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=t2_id,  # t2 replaces t1
     )
@@ -478,7 +478,7 @@ async def test_get_refresh_token_family_state(
         id=user_id,
         email=f"family-state-{user_id}@example.com",
         password_hash="hash",
-        created_at=datetime.now(UTC),
+        created_at=datetime(2025, 1, 1, tzinfo=UTC),
         tenant_id=None,
         disabled=False,
     )
@@ -491,8 +491,8 @@ async def test_get_refresh_token_family_state(
         user_id=user_id,
         family_id=family_id,
         hash="h1",
-        issued_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC),
+        issued_at=datetime(2025, 1, 1, tzinfo=UTC),
+        expires_at=datetime(2025, 1, 8, tzinfo=UTC),
         revoked_at=None,
         replaced_by=None,
     )

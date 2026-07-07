@@ -68,6 +68,7 @@ class AuthService:
             tenant_id=None,  # Default to no tenant for now
             disabled=False,
         )
+        await self._session.commit()
 
         return AuthenticatedUser(
             user_id=UserId(str(user_record.id)),
@@ -86,7 +87,9 @@ class AuthService:
         if not self._password_hasher.verify(creds.password, user.password_hash):
             raise InvalidCredentialsError()
 
-        return await self._issue_tokens(user)
+        tokens = await self._issue_tokens(user)
+        await self._session.commit()
+        return tokens
 
     async def refresh(self, refresh_token_string: str) -> tuple[AccessToken, RefreshToken]:
         """Rotate a refresh token."""
@@ -122,6 +125,7 @@ class AuthService:
                 family_id=token_record.family_id,
                 revoked_at=self._clock.now(),
             )
+            await self._session.commit()
             logger.error(
                 "refresh_token_reuse_detected",
                 user_id=token_record.user_id,
@@ -145,18 +149,21 @@ class AuthService:
         new_token_id = uuid4()
         now = self._clock.now()
 
-        # T-907A: Insert the new refresh token before updating the old token's
-        # replaced_by FK to satisfy the DB constraint.
-        tokens = await self._issue_tokens(
-            user, family_id=token_record.family_id, token_id=new_token_id
-        )
-
+        # Fix T-906B: Mark the old token as replaced BEFORE inserting the new token.
+        # This satisfies the ix_refresh_tokens_family_active unique constraint.
+        # The ForeignKeyViolation is avoided by making replaced_by DEFERRABLE.
         await persistence.mark_refresh_token_replaced(
             self._session,
             token_id=token_record.id,
             replaced_by=new_token_id,
             revoked_at=now,
         )
+
+        tokens = await self._issue_tokens(
+            user, family_id=token_record.family_id, token_id=new_token_id
+        )
+
+        await self._session.commit()
 
         return tokens
 
@@ -186,6 +193,7 @@ class AuthService:
             token_id=token_id,
             revoked_at=self._clock.now(),
         )
+        await self._session.commit()
 
     async def _issue_tokens(
         self,

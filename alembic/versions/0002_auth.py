@@ -44,7 +44,13 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("replaced_by", sa.UUID(), nullable=True),
-        sa.ForeignKeyConstraint(["replaced_by"], ["refresh_tokens.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["replaced_by"],
+            ["refresh_tokens.id"],
+            ondelete="SET NULL",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )

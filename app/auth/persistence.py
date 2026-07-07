@@ -49,7 +49,9 @@ class RefreshTokenRow(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replaced_by: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("refresh_tokens.id", ondelete="SET NULL"), nullable=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("refresh_tokens.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED"),
+        nullable=True,
     )
 
     __table_args__ = (

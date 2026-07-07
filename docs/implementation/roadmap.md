@@ -108,7 +108,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 - [x] **T-905** — `app/auth/persistence.py` + migration — `UserRow` and `RefreshTokenRow` mapped classes translated to auth domain/read-model types at the boundary.
 - [x] **T-905A** — Refresh-token persistence mutation helpers — Add rotation, single-token revocation, and family revocation helpers returning auth domain/read-model records.
 - [x] **T-906A** — Auth runtime wiring — Wire `PasswordHasher` and `TokenSigner` into the `Container` through `app/core/wiring/auth.py`.
-- [ ] **T-906B** — Auth production refinement — Fix refresh-token rotation transaction ordering
+- [x] **T-906B** — Auth production refinement — Fix refresh-token rotation transaction ordering
 - [x] **T-906** — Auth service + policies + deps — `register/login/refresh/logout` service with refresh-token rotation and reuse detection.
 - [x] **T-907** — `app/auth/api.py` — `/auth/register|login|refresh|logout` endpoints raising only `AppError` subclasses.
 - [x] **T-907A** — Auth production refinement — Fix refresh FK bug, wire Clock, and remove API TODOs.

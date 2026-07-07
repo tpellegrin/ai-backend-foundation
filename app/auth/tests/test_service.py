@@ -467,9 +467,9 @@ async def test_refresh_rotation_order(
 
         await service.refresh("old-token")
 
-        # Verify call order: insert_token must be before mark_replaced
-        # manager.mock_calls shows all calls to attached mocks
+        # Verify call order: mark_replaced must be BEFORE insert_token
+        # to satisfy the unique index constraint.
         call_names = [call[0] for call in manager.mock_calls]
-        assert "insert_token" in call_names
         assert "mark_replaced" in call_names
-        assert call_names.index("insert_token") < call_names.index("mark_replaced")
+        assert "insert_token" in call_names
+        assert call_names.index("mark_replaced") < call_names.index("insert_token")
