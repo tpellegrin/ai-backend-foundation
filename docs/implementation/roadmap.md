@@ -119,10 +119,10 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 
 ## S10 — Prompts
 
-- [ ] **T-1001** — `app/prompts/{domain,ports,registry}.py` — `Prompt` dataclass and `PromptRegistry` protocol with Jinja2 rendering + schema validation.
-- [ ] **T-1002** — `library/rag_answer_v1.yaml` + IO schemas — Canonical Phase 2 prompt with declared input/output Pydantic schemas.
-- [ ] **T-1003** — `app/prompts/api.py` (read-only) — `GET /prompts` and `GET /prompts/{id}/{version}` for prompt inspection.
-- [ ] **T-1004** — Registry render + schema-validation tests — Verify template render + schema round-trip on the shipped prompt.
+- [ ] **T-1001** — `app/prompts` foundation and filesystem registry — `Prompt` dataclass and `PromptRegistry` protocol with Jinja2 rendering + schema validation.
+- [ ] **T-1002** — `app/prompts/library/rag_answer_v1.{yaml,py}` — Canonical Phase 2 prompt with declared input/output Pydantic schemas.
+- [ ] **T-1003** — Prompt registry runtime wiring and API-edge dependency — Wire the prompt registry into the application container.
+- [ ] **T-1004** — Prompt inspection API and shipped prompt verification — `GET /prompts` and `GET /prompts/{prompt_id}/{version}` for prompt inspection.
 
 ## S11 — LLM + embeddings ports
 
