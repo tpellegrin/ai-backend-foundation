@@ -1,3 +1,4 @@
+from app.auth import api
 from app.auth.domain import (
     AccessToken,
     AuthenticatedUser,
@@ -22,4 +23,5 @@ __all__ = [
     "RefreshTokenRecord",
     "TokenSigner",
     "UserAuthRecord",
+    "api",
 ]

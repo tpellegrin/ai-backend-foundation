@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app import auth
+
 
 def build_v1_router() -> APIRouter:
     """
@@ -10,5 +12,7 @@ def build_v1_router() -> APIRouter:
     As of T-503, it returns an empty router.
     """
     router = APIRouter(prefix="/api/v1")
+
+    router.include_router(auth.api.router, prefix="/auth", tags=["auth"])
 
     return router

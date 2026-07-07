@@ -109,7 +109,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 - [x] **T-905A** — Refresh-token persistence mutation helpers — Add rotation, single-token revocation, and family revocation helpers returning auth domain/read-model records.
 - [x] **T-906A** — Auth runtime wiring — Wire `PasswordHasher` and `TokenSigner` into the `Container` through `app/core/wiring/auth.py`.
 - [x] **T-906** — Auth service + policies + deps — `register/login/refresh/logout` service with refresh-token rotation and reuse detection.
-- [ ] **T-907** — `app/auth/api.py` — `/auth/register|login|refresh|logout` endpoints raising only `AppError` subclasses.
+- [x] **T-907** — `app/auth/api.py` — `/auth/register|login|refresh|logout` endpoints raising only `AppError` subclasses.
 - [ ] **T-908** — Auth API tests + refresh-reuse detection — Happy path, 401/422, Problem Details, `X-Request-ID`, and family revocation on reuse.
 - [ ] **T-910** — `app/users/` minimal — `User` profile, `GET /api/v1/users/me`, and lazy `get_or_create_profile` on first read.
 
