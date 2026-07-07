@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, update
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -167,3 +168,80 @@ async def get_active_refresh_token_by_family(
     result = await session.execute(stmt)
     row = result.scalar_one_or_none()
     return row.to_domain() if row else None
+
+
+async def mark_refresh_token_replaced(
+    session: AsyncSession,
+    *,
+    token_id: UUID,
+    replaced_by: UUID,
+    revoked_at: datetime,
+) -> RefreshTokenRecord | None:
+    stmt = (
+        update(RefreshTokenRow)
+        .where(RefreshTokenRow.id == token_id)
+        .values(replaced_by=replaced_by, revoked_at=revoked_at)
+        .returning(RefreshTokenRow)
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row:
+        await session.flush()
+        return row.to_domain()
+    return None
+
+
+async def revoke_refresh_token(
+    session: AsyncSession,
+    *,
+    token_id: UUID,
+    revoked_at: datetime,
+) -> RefreshTokenRecord | None:
+    stmt = (
+        update(RefreshTokenRow)
+        .where(RefreshTokenRow.id == token_id)
+        .values(revoked_at=revoked_at)
+        .returning(RefreshTokenRow)
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row:
+        await session.flush()
+        return row.to_domain()
+    return None
+
+
+async def revoke_refresh_token_family(
+    session: AsyncSession,
+    *,
+    family_id: UUID,
+    revoked_at: datetime,
+) -> int:
+    stmt = (
+        update(RefreshTokenRow)
+        .where(
+            RefreshTokenRow.family_id == family_id,
+            RefreshTokenRow.revoked_at == None,  # noqa: E711
+        )
+        .values(revoked_at=revoked_at)
+        .returning(RefreshTokenRow.id)
+    )
+    result = await session.execute(stmt)
+    count = len(result.all())
+    await session.flush()
+    return count
+
+
+async def get_refresh_token_family_state(
+    session: AsyncSession,
+    *,
+    family_id: UUID,
+) -> Sequence[RefreshTokenRecord]:
+    stmt = (
+        select(RefreshTokenRow)
+        .where(RefreshTokenRow.family_id == family_id)
+        .order_by(RefreshTokenRow.issued_at.asc())
+    )
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [row.to_domain() for row in rows]

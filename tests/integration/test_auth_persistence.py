@@ -19,10 +19,14 @@ from app.auth.persistence import (
     get_active_refresh_token_by_family,
     get_refresh_token_by_hash,
     get_refresh_token_by_id,
+    get_refresh_token_family_state,
     get_user_by_email,
     get_user_by_id,
     insert_refresh_token,
     insert_user,
+    mark_refresh_token_replaced,
+    revoke_refresh_token,
+    revoke_refresh_token_family,
 )
 from app.core.config import get_settings
 from app.infrastructure.db.engine import create_engine_from, create_session_factory
@@ -269,3 +273,234 @@ async def test_boundary_checks(session: AsyncSession, alembic_config: Config) ->
     assert "app.infrastructure.db" not in source
     # 3. Does not import app.infrastructure (broader requirement from Finding 2)
     assert "app.infrastructure" not in source
+
+
+@pytest.mark.integration
+async def test_mark_refresh_token_replaced(session: AsyncSession, alembic_config: Config) -> None:
+    user_id = uuid.uuid4()
+    await insert_user(
+        session,
+        id=user_id,
+        email=f"replace-{user_id}@example.com",
+        password_hash="hash",
+        created_at=datetime.now(UTC),
+        tenant_id=None,
+        disabled=False,
+    )
+
+    token1_id = uuid.uuid4()
+    token2_id = uuid.uuid4()
+    revoked_at = datetime.now(UTC)
+
+    # We must insert token2 first if it is to replace token1 (because of FK)
+    # OR we can just use token1_id as replaced_by for testing purposes if FK allows self-ref
+    # Actually, let's insert token2.
+    await insert_refresh_token(
+        session,
+        id=token2_id,
+        user_id=user_id,
+        family_id=uuid.uuid4(),
+        hash="hash-2",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=None,
+        replaced_by=None,
+    )
+
+    await insert_refresh_token(
+        session,
+        id=token1_id,
+        user_id=user_id,
+        family_id=uuid.uuid4(),
+        hash="hash-1",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=None,
+        replaced_by=None,
+    )
+
+    # Act
+    record = await mark_refresh_token_replaced(
+        session,
+        token_id=token1_id,
+        replaced_by=token2_id,
+        revoked_at=revoked_at,
+    )
+
+    # Assert
+    assert record is not None
+    assert record.id == token1_id
+    assert record.replaced_by == token2_id
+    assert record.revoked_at == revoked_at
+
+    # Verify in DB
+    found = await get_refresh_token_by_id(session, token1_id)
+    assert found is not None
+    assert found.replaced_by == token2_id
+    assert found.revoked_at == revoked_at
+
+
+@pytest.mark.integration
+async def test_revoke_refresh_token(session: AsyncSession, alembic_config: Config) -> None:
+    user_id = uuid.uuid4()
+    await insert_user(
+        session,
+        id=user_id,
+        email=f"revoke-{user_id}@example.com",
+        password_hash="hash",
+        created_at=datetime.now(UTC),
+        tenant_id=None,
+        disabled=False,
+    )
+
+    token_id = uuid.uuid4()
+    revoked_at = datetime.now(UTC)
+
+    await insert_refresh_token(
+        session,
+        id=token_id,
+        user_id=user_id,
+        family_id=uuid.uuid4(),
+        hash="hash-1",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=None,
+        replaced_by=None,
+    )
+
+    # Act
+    record = await revoke_refresh_token(
+        session,
+        token_id=token_id,
+        revoked_at=revoked_at,
+    )
+
+    # Assert
+    assert record is not None
+    assert record.id == token_id
+    assert record.revoked_at == revoked_at
+
+    # Verify in DB
+    found = await get_refresh_token_by_id(session, token_id)
+    assert found is not None
+    assert found.revoked_at == revoked_at
+
+
+@pytest.mark.integration
+async def test_revoke_refresh_token_family(session: AsyncSession, alembic_config: Config) -> None:
+    user_id = uuid.uuid4()
+    await insert_user(
+        session,
+        id=user_id,
+        email=f"family-rev-{user_id}@example.com",
+        password_hash="hash",
+        created_at=datetime.now(UTC),
+        tenant_id=None,
+        disabled=False,
+    )
+
+    family_id = uuid.uuid4()
+    revoked_at = datetime.now(UTC)
+
+    # Insert 3 tokens in family: t2 replaces t1, t3 is already revoked and replaces t2.
+    # We must insert in reverse order of replacement to satisfy FK if we use immediate FKs.
+    # Actually, SQLAlchemy with asyncpg might not care about order if we don't commit,
+    # but the DB enforces it on flush if the constraint is not DEFERRABLE.
+    # Let's just insert them with replaced_by=None first and then update, or insert in order.
+
+    t3_id = uuid.uuid4()
+    already_revoked_at = datetime.now(UTC) - timedelta(hours=1)
+    await insert_refresh_token(
+        session,
+        id=t3_id,
+        user_id=user_id,
+        family_id=family_id,
+        hash="h3",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=already_revoked_at,
+        replaced_by=None,
+    )
+
+    t2_id = uuid.uuid4()
+    await insert_refresh_token(
+        session,
+        id=t2_id,
+        user_id=user_id,
+        family_id=family_id,
+        hash="h2",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=None,
+        replaced_by=t3_id,  # t3 replaces t2
+    )
+
+    t1_id = uuid.uuid4()
+    await insert_refresh_token(
+        session,
+        id=t1_id,
+        user_id=user_id,
+        family_id=family_id,
+        hash="h1",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=None,
+        replaced_by=t2_id,  # t2 replaces t1
+    )
+
+    # Act
+    count = await revoke_refresh_token_family(
+        session,
+        family_id=family_id,
+        revoked_at=revoked_at,
+    )
+
+    # Assert
+    assert count == 2  # noqa: PLR2004  # t1 and t2 should be revoked. t3 was already revoked.
+
+    # Verify in DB
+    state = await get_refresh_token_family_state(session, family_id=family_id)
+    assert len(state) == 3  # noqa: PLR2004
+    for rec in state:
+        if rec.id == t3_id:
+            assert rec.revoked_at == already_revoked_at
+        else:
+            assert rec.revoked_at == revoked_at
+
+
+@pytest.mark.integration
+async def test_get_refresh_token_family_state(
+    session: AsyncSession, alembic_config: Config
+) -> None:
+    user_id = uuid.uuid4()
+    await insert_user(
+        session,
+        id=user_id,
+        email=f"family-state-{user_id}@example.com",
+        password_hash="hash",
+        created_at=datetime.now(UTC),
+        tenant_id=None,
+        disabled=False,
+    )
+
+    family_id = uuid.uuid4()
+    t1_id = uuid.uuid4()
+    await insert_refresh_token(
+        session,
+        id=t1_id,
+        user_id=user_id,
+        family_id=family_id,
+        hash="h1",
+        issued_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC),
+        revoked_at=None,
+        replaced_by=None,
+    )
+
+    # Act
+    state = await get_refresh_token_family_state(session, family_id=family_id)
+
+    # Assert
+    assert len(state) == 1
+    assert isinstance(state[0], RefreshTokenRecord)
+    assert state[0].id == t1_id
