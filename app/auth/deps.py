@@ -134,10 +134,14 @@ async def get_current_user(
         raise AuthenticationError("Invalid token claims: missing sub")  # noqa: TRY003
 
     tenant_id_str = claims.get("tenant_id")
+    email = claims.get("email")
+    if not email:
+        raise AuthenticationError("Invalid token claims: missing email")  # noqa: TRY003
     scopes = claims.get("scopes", [])
 
     user = AuthenticatedUser(
         user_id=UserId(str(UUID(user_id_str))),
+        email=email,
         tenant_id=TenantId(str(UUID(tenant_id_str))) if tenant_id_str else TenantId(""),
         scopes=frozenset(scopes),
     )

@@ -13,6 +13,7 @@ from app.shared.types import TenantId, UserId
 def auth_user() -> AuthenticatedUser:
     return AuthenticatedUser(
         user_id=UserId(str(uuid4())),
+        email="test@example.com",
         tenant_id=TenantId(str(uuid4())),
         scopes=frozenset(["user"]),
     )

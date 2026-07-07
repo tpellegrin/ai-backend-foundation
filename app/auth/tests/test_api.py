@@ -53,8 +53,10 @@ def client(app: FastAPI) -> TestClient:
 def test_register_happy_path(client: TestClient, mock_auth_service: AsyncMock) -> None:
     user_id = str(uuid.uuid4())
     tenant_id = str(uuid.uuid4())
+    email = "test@example.com"
     mock_auth_service.register.return_value = AuthenticatedUser(
         user_id=UserId(user_id),
+        email=email,
         tenant_id=TenantId(tenant_id),
         scopes=frozenset(["user"]),
     )

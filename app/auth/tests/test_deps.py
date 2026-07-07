@@ -54,8 +54,10 @@ async def test_get_current_user_happy_path(
 ) -> None:
     user_id = uuid4()
     tenant_id = uuid4()
+    email = "test@example.com"
     mock_container.token_signer.verify.return_value = {
         "sub": str(user_id),
+        "email": email,
         "tenant_id": str(tenant_id),
         "typ": "access",
         "active": True,
@@ -68,6 +70,7 @@ async def test_get_current_user_happy_path(
 
     assert isinstance(user, AuthenticatedUser)
     assert user.user_id == str(user_id)
+    assert user.email == email
     assert user.tenant_id == str(tenant_id)
     assert "user" in user.scopes
 
@@ -90,6 +93,7 @@ async def test_get_current_user_disabled_user(
 ) -> None:
     mock_container.token_signer.verify.return_value = {
         "sub": str(uuid4()),
+        "email": "test@example.com",
         "typ": "access",
         "active": False,
         "scopes": ["user"],
@@ -108,6 +112,7 @@ async def test_get_current_user_missing_active_claim(
 ) -> None:
     mock_container.token_signer.verify.return_value = {
         "sub": str(uuid4()),
+        "email": "test@example.com",
         "typ": "access",
         # "active" is missing
         "scopes": ["user"],
@@ -118,6 +123,24 @@ async def test_get_current_user_missing_active_claim(
     with pytest.raises(AuthenticationError) as excinfo:
         await get_current_user(mock_request, auth_creds)
     assert excinfo.value.detail == "User is disabled"
+
+
+@pytest.mark.unit
+async def test_get_current_user_missing_email_claim(
+    mock_request: MagicMock, mock_container: MagicMock
+) -> None:
+    mock_container.token_signer.verify.return_value = {
+        "sub": str(uuid4()),
+        "typ": "access",
+        "active": True,
+        "scopes": ["user"],
+    }
+
+    auth_creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+
+    with pytest.raises(AuthenticationError) as excinfo:
+        await get_current_user(mock_request, auth_creds)
+    assert excinfo.value.detail == "Invalid token claims: missing email"
 
 
 @pytest.mark.unit

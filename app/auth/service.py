@@ -72,6 +72,7 @@ class AuthService:
 
         return AuthenticatedUser(
             user_id=UserId(str(user_record.id)),
+            email=user_record.email,
             tenant_id=TenantId(str(user_record.tenant_id))
             if user_record.tenant_id
             else TenantId(""),
@@ -201,6 +202,10 @@ class AuthService:
         family_id: UUID | None = None,
         token_id: UUID | None = None,
     ) -> tuple[AccessToken, RefreshToken]:
+        """Issue access and refresh tokens for a user.
+
+        The access token includes the user's email as a claim.
+        """
         now = self._clock.now()
         access_expires = now + timedelta(minutes=self._access_token_expires_minutes)
         refresh_expires = now + timedelta(days=self._refresh_token_expires_days)
@@ -213,6 +218,7 @@ class AuthService:
         access_token_str = self._token_signer.sign(
             {
                 "sub": str(user.id),
+                "email": user.email,
                 "tenant_id": str(user.tenant_id) if user.tenant_id else None,
                 "typ": "access",
                 "active": not user.disabled,

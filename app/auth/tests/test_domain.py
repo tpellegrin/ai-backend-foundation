@@ -26,6 +26,7 @@ def test_credentials_is_frozen() -> None:
 def test_authenticated_user_is_frozen() -> None:
     u = AuthenticatedUser(
         user_id=UserId("user-1"),
+        email="test@example.com",
         tenant_id=TenantId("tenant-1"),
         scopes=frozenset(["read"]),
     )

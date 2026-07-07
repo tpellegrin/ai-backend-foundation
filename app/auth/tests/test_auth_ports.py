@@ -39,6 +39,7 @@ class FakeIdentityProvider:
     async def authenticate(self, creds: Credentials) -> AuthenticatedUser:
         return AuthenticatedUser(
             user_id=UserId("user_123"),
+            email="testuser@example.com",
             tenant_id=TenantId("tenant_456"),
             scopes=frozenset(["read", "write"]),
         )

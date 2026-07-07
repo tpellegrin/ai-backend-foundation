@@ -77,6 +77,7 @@ async def test_register_happy_path(
         user = await service.register(email, password)
 
         assert user.user_id == UserId(str(mock_insert.return_value.id))
+        assert user.email == email
         assert user.tenant_id == TenantId("")
         assert user.scopes == frozenset(["user"])
         mock_insert.assert_called_once()
@@ -126,6 +127,9 @@ async def test_login_happy_path(
 
         assert at.token == "signed-token"
         assert rt.token == "signed-token"
+        # Verify access token has email
+        access_token_claims = mock_signer.sign.call_args_list[0].args[0]
+        assert access_token_claims["email"] == email
         mock_insert.assert_called_once()
 
 
@@ -198,6 +202,9 @@ async def test_refresh_rotation_happy_path(
 
         assert at.token == "signed-token"
         assert rt.token == "signed-token"
+        # Verify access token has email
+        access_token_claims = mock_signer.sign.call_args_list[0].args[0]
+        assert access_token_claims["email"] == user_record.email
         mock_replace.assert_called_once()
         mock_insert.assert_called_once()
 

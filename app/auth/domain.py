@@ -44,8 +44,13 @@ class AuthenticatedUser:
     """A user that has been successfully authenticated."""
 
     user_id: UserId
+    email: str
     tenant_id: TenantId
     scopes: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if not self.email:
+            raise ValueError("email must not be empty")  # noqa: TRY003
 
 
 @dataclass(frozen=True)
