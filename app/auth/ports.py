@@ -8,12 +8,16 @@ from app.auth.domain import AuthenticatedUser, Credentials
 class PasswordHasher(Protocol):
     """Port for password hashing and verification."""
 
-    def hash(self, plaintext: str) -> str:
+    def hash(self, password: str) -> str:
         """Hash a plaintext password."""
         ...
 
-    def verify(self, hash: str, plaintext: str) -> bool:
+    def verify(self, password: str, password_hash: str) -> bool:
         """Verify a plaintext password against a hash."""
+        ...
+
+    def needs_rehash(self, password_hash: str) -> bool:
+        """Check if the password hash needs to be re-hashed."""
         ...
 
 

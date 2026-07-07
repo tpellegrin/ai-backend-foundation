@@ -198,6 +198,27 @@ class Governance(BaseSettings):
         return cast(tuple[str, ...], v)
 
 
+class Argon2(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+    time_cost: int = Field(
+        default=2, ge=1, validation_alias=AliasChoices("ARGON2_TIME_COST", "argon2__time_cost")
+    )
+    memory_cost: int = Field(
+        default=19456,
+        ge=1,
+        validation_alias=AliasChoices("ARGON2_MEMORY_COST", "argon2__memory_cost"),
+    )
+    parallelism: int = Field(
+        default=1, ge=1, validation_alias=AliasChoices("ARGON2_PARALLELISM", "argon2__parallelism")
+    )
+    hash_len: int = Field(
+        default=32, ge=1, validation_alias=AliasChoices("ARGON2_HASH_LEN", "argon2__hash_len")
+    )
+    salt_len: int = Field(
+        default=16, ge=1, validation_alias=AliasChoices("ARGON2_SALT_LEN", "argon2__salt_len")
+    )
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -215,6 +236,7 @@ class AppSettings(BaseSettings):
     blob: BlobStorage = Field(default_factory=BlobStorage)
     otel: Otel = Field(default_factory=Otel)
     governance: Governance = Field(default_factory=Governance)
+    argon2: Argon2 = Field(default_factory=Argon2)
     http: Http = Field(default_factory=Http)
     arq: Arq = Field(default_factory=Arq)
     api: Api = Field(default_factory=Api)

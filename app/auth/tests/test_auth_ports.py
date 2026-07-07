@@ -13,11 +13,14 @@ from app.shared.types import TenantId, UserId
 class FakePasswordHasher:
     """Fake implementation of PasswordHasher."""
 
-    def hash(self, plaintext: str) -> str:
-        return f"hashed_{plaintext}"
+    def hash(self, password: str) -> str:
+        return f"hashed_{password}"
 
-    def verify(self, hash: str, plaintext: str) -> bool:
-        return hash == f"hashed_{plaintext}"
+    def verify(self, password: str, password_hash: str) -> bool:
+        return password_hash == f"hashed_{password}"
+
+    def needs_rehash(self, password_hash: str) -> bool:
+        return False
 
 
 class FakeTokenSigner:
@@ -45,7 +48,7 @@ class FakeIdentityProvider:
 def test_password_hasher_protocol() -> None:
     hasher: PasswordHasher = FakePasswordHasher()
     assert hasher.hash("password") == "hashed_password"
-    assert hasher.verify("hashed_password", "password") is True
+    assert hasher.verify("password", "hashed_password") is True
     assert isinstance(hasher, PasswordHasher)
 
 

@@ -286,3 +286,63 @@ def test_env_example_superset() -> None:
     # per T-109 requirement.
     missing = app_aliases - example_keys
     assert not missing, f"Env vars {missing} are used in code but missing from .env.example"
+
+
+@pytest.mark.unit
+def test_argon2_defaults(valid_env_vars: dict[str, str]) -> None:
+    get_settings.cache_clear()
+    settings = AppSettings()
+    assert settings.argon2.time_cost == 2
+    assert settings.argon2.memory_cost == 19456
+    assert settings.argon2.parallelism == 1
+    assert settings.argon2.hash_len == 32
+    assert settings.argon2.salt_len == 16
+
+
+@pytest.mark.unit
+def test_argon2_env_parsing(
+    valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ARGON2_TIME_COST", "3")
+    monkeypatch.setenv("ARGON2_MEMORY_COST", "65536")
+    monkeypatch.setenv("ARGON2_PARALLELISM", "4")
+    monkeypatch.setenv("ARGON2_HASH_LEN", "64")
+    monkeypatch.setenv("ARGON2_SALT_LEN", "32")
+    settings = AppSettings()
+    assert settings.argon2.time_cost == 3
+    assert settings.argon2.memory_cost == 65536
+    assert settings.argon2.parallelism == 4
+    assert settings.argon2.hash_len == 64
+    assert settings.argon2.salt_len == 32
+
+
+@pytest.mark.unit
+def test_argon2_nested_env_parsing(
+    valid_env_vars: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ARGON2__TIME_COST", "4")
+    settings = AppSettings()
+    assert settings.argon2.time_cost == 4
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "env_var",
+    [
+        "ARGON2_TIME_COST",
+        "ARGON2_MEMORY_COST",
+        "ARGON2_PARALLELISM",
+        "ARGON2_HASH_LEN",
+        "ARGON2_SALT_LEN",
+    ],
+)
+@pytest.mark.parametrize("bad_value", ["0", "-1"])
+def test_argon2_rejects_non_positive_integers(
+    valid_env_vars: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    env_var: str,
+    bad_value: str,
+) -> None:
+    monkeypatch.setenv(env_var, bad_value)
+    with pytest.raises(ValidationError):
+        AppSettings()
