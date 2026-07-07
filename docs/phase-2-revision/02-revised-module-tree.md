@@ -69,8 +69,12 @@ ai-backend-foundation/                          # CHANGED: renamed from ai-backe
     │   ├── middleware.py
     │   └── health.py
     │
-    ├── platform/                               # NEW: cross-cutting PORTS ONLY (no adapters, no SDKs)
+    ├── platform/                               # NEW: cross-cutting PORTS AND MAPPING FOUNDATION
     │   ├── __init__.py
+    │   ├── db/                                 # NEW: shared SQLAlchemy Base + MetaData + mapping types
+    │   │   ├── __init__.py
+    │   │   ├── base.py
+    │   │   └── types.py
     │   ├── storage/
     │   │   ├── ports.py                        # BlobStorage protocol + value types
     │   │   └── __init__.py
@@ -88,7 +92,7 @@ ai-backend-foundation/                          # CHANGED: renamed from ai-backe
     │       └── __init__.py
     │
     ├── infrastructure/                         # CHANGED: adapters ONLY; never imported outside app.core
-    │   ├── db/                                 # async engine, sessionmaker, base metadata, pgvector type
+    │   ├── db/                                 # async engine, sessionmaker, database lifecycle
     │   ├── redis/                              # async Redis client + Cache adapter (impl of platform.cache)
     │   ├── http/                               # shared httpx client with retries, timeouts, OTel
     │   ├── storage/                            # local FS + S3 adapters (impl of platform.storage)

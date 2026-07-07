@@ -37,7 +37,11 @@ A clean dependency graph is what makes a codebase *navigable* in year three. We 
                     └──────────────────────┬───────────────────────┘
                                            │
                     ┌──────────────────────▼───────────────────────┐
-        L1  infra   │  app.infrastructure.*                        │
+        L1  platform│  app.platform.*                              │
+                    └──────────────────────┬───────────────────────┘
+                                           │
+                    ┌──────────────────────▼───────────────────────┐
+        L0.5 infra  │  app.infrastructure.*                        │
                     └──────────────────────┬───────────────────────┘
                                            │
                     ┌──────────────────────▼───────────────────────┐
@@ -111,6 +115,7 @@ A clean dependency graph is what makes a codebase *navigable* in year three. We 
 | `BlobStorage`     | `app.platform.storage.ports` | `app.documents`, `app.ai`                            | `app.infrastructure.storage.*`            |
 | `Cache`           | `app.platform.cache.ports`   | many                                                 | `app.infrastructure.redis.*`              |
 | `TaskQueue`       | `app.platform.queue.ports`   | `app.documents`, `app.rag`, `app.ai`                 | `app.infrastructure.queue.*`              |
+| `Base`, `Vector`  | `app.platform.db`            | `app.*.persistence`, `app.infrastructure.db`        | (mapping foundation)                      |
 | `IdentityProvider`| `app.auth.ports`      | `app.auth`                                                 | `app.auth.adapters.*`                     |
 | `PasswordHasher`  | `app.auth.ports`      | `app.auth`                                                 | `app.auth.adapters.argon2_hasher`         |
 | `TokenSigner`     | `app.auth.ports`      | `app.auth`                                                 | `app.auth.adapters.jwt_signer`            |

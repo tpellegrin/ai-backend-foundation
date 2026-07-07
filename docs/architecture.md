@@ -161,7 +161,7 @@ query → expand? → embed → search(VectorStore) → rerank? → cite → ans
 ## 6. Persistence
 
 - **SQLAlchemy 2.x** with the typed declarative API (`Mapped[...]`, `mapped_column`) and the **async engine** + `asyncpg` driver.
-- **Alembic** for migrations; one migration history for the whole app. Each module owns its tables but shares the metadata.
+- **Alembic** for migrations; one migration history for the whole app. Each module owns its tables but shares the metadata. The shared mapping foundation (`Base`, `Vector`) lives in `app.platform.db`; the runtime infrastructure (engines, sessions) lives in `app.infrastructure.db`.
 - **No generic `Repository<T>`**. Queries are written as small functions that take an `AsyncSession` and return domain objects or DTOs. Repositories appear only when a module legitimately needs to swap persistence (rare) or has a complex query surface worth naming ([ADR-0007](adr/0007-no-generic-repository-pattern.md)).
 - **Unit of Work** is the request: one `AsyncSession` per request, committed by the route handler or the application service, rolled back by the error middleware.
 - **pgvector** is enabled at the database level; vector columns are normal columns with a typed wrapper.

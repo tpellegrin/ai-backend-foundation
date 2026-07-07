@@ -78,8 +78,16 @@ app/
 │   ├── middleware.py           # access log + correlation + exception → problem details
 │   └── health.py               # /healthz, /readyz, /livez routers and probes registry
 │
+├── platform/                       # cross-cutting PORTS and mapping foundation
+│   ├── db/                         # shared SQLAlchemy Base + MetaData + mapping types
+│   ├── storage/                    # BlobStorage port + value types
+│   ├── cache/                      # Cache port
+│   ├── queue/                      # TaskQueue port + Job descriptor
+│   ├── rate_limit/                 # RateLimiter port
+│   └── idempotency/                # IdempotencyStore port
+│
 ├── infrastructure/             # third-party adapters and engines, owned by no single domain
-│   ├── db/                     # async engine, sessionmaker, base metadata, pgvector type
+│   ├── db/                     # async engine, sessionmaker, database lifecycle
 │   ├── redis/                  # async Redis client factory + Cache adapter
 │   ├── http/                   # shared httpx client with retries, timeouts, OTel instrumentation
 │   ├── storage/                # BlobStorage port + local & S3 adapters

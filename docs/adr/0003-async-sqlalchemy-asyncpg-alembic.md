@@ -12,7 +12,7 @@ Our HTTP path is async (FastAPI). Mixing a sync ORM with async handlers causes t
 - **SQLAlchemy 2.x async** with the typed declarative API (`DeclarativeBase`, `Mapped[T]`, `mapped_column`).
 - **`asyncpg`** as the database driver (`postgresql+asyncpg://…`). It is the fastest, most correct PG driver in Python.
 - **One `AsyncSession` per request**, created by a FastAPI dependency and closed by the dependency's teardown. Commits happen in the application service or the route handler, never implicitly.
-- **One global `MetaData`** in `app.infrastructure.db.base.Base.metadata`. Each module declares its mapped classes in its own `persistence.py`, all sharing the global metadata so Alembic sees them.
+- **One global `MetaData`** in `app.platform.db.base.Base.metadata`. Each module declares its mapped classes in its own `persistence.py`, all sharing the global metadata so Alembic sees them.
 - **Alembic** for migrations, one linear history. Auto-generation is a *draft*, not the source of truth — every migration is reviewed and committed by hand. Naming convention for constraints (`ix_`, `uq_`, `ck_`, `fk_`, `pk_`) is configured to produce stable DDL diffs.
 - **pgvector**: install via Alembic (`CREATE EXTENSION IF NOT EXISTS vector`). Use the official `pgvector.sqlalchemy.Vector` type wrapped in a small project-local column helper so dimension is explicit at the column site.
 - **PgBouncer compatibility**: when running behind PgBouncer in transaction-pooling mode, disable server-side prepared statement caching (`prepared_statement_cache_size=0`, `statement_cache_size=0`). Made explicit in `DatabaseSettings`.

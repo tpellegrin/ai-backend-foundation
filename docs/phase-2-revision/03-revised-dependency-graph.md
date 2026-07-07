@@ -49,7 +49,7 @@ changes that.
                     │   ├──────────────────────────────────────────────────────┤     │
                     │   │  L3  cap.     app.llm  app.embeddings  app.prompts   │     │
                     │   ├──────────────────────────────────────────────────────┤     │
-                    │   │  L2  platform app.platform.*   (PORTS ONLY)          │     │
+                    │   │  L2  platform app.platform.*   (PORTS & MAPPING)     │     │
                     │   ├──────────────────────────────────────────────────────┤     │
                     │   │  L0  leaves   app.shared    app.observability        │     │
                     │   └──────────────────────────────────────────────────────┘     │
@@ -62,7 +62,7 @@ changes that.
 **Direction rules** (ADR-0026):
 
 - **Inside the layered core**: a module at layer `Ln` may import from lower layers. Same-layer imports are allowed only when explicitly listed in the whitelisted-edge table or permitted by a dedicated contract. Otherwise, sibling modules should remain independent.
-- **Adapter ring → core (inward)**: `app.infrastructure.*` may import from any port-owning layer it implements — `app.platform.*` (L2), any capability (L3: `app.llm`, `app.embeddings`, `app.prompts`), any domain (L4: `app.auth`, `app.users`, `app.documents`, `app.rag`, `app.ai`, `app.ai_governance`). It may also import from `app.shared` and `app.observability`.
+- **Adapter ring → core (inward)**: `app.infrastructure.*` may import from any port-owning layer it implements — `app.platform.*` (L2), any capability (L3: `app.llm`, `app.embeddings`, `app.prompts`), any domain (L4: `app.auth`, `app.users`, `app.documents`, `app.rag`, `app.ai`, `app.ai_governance`). It may also import from the platform mapping foundation (`app.platform.db`) and from `app.shared` and `app.observability`.
 - **Core → adapter ring (outward)**: forbidden **except** from `app.core.wiring.*`. `app.main` reaches infrastructure **only transitively** via `app.core.lifespan → app.core.wiring.<x> → app.infrastructure.<x>` (ADR-0023). This direct-import ban is enforced by two forbidden contracts (`core-wiring-only-infra` and `infrastructure-only-via-core-wiring`) using direct-import semantics (ADR-0025 and ADR-0026).
 - **Cross-adapter**: adapters should not import other adapters. `app.core.wiring.*` composes them.
 
@@ -333,7 +333,7 @@ Read arrows as **imports**.
    │          │              └────────────┼────────────┘
    │          │                           │
    │          │                           ▼
-   │          │                       platform/* (ports)
+   │          │                       platform/* (ports & mapping)
    │          │                           ▲
    │          │                           │
    │          │              infrastructure.* imports ports it implements
