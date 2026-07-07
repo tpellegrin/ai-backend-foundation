@@ -101,7 +101,7 @@ The roadmap is a **status mirror**, not a source of truth. Update rules:
 ## S09 — Auth + Users
 
 - [x] **T-901** — `app/auth/domain.py` — Frozen `Credentials`, `AuthenticatedUser`, `AccessToken`, `RefreshToken`, and auth-specific errors.
-- [ ] **T-902** — `app/auth/ports.py` — `PasswordHasher`, `TokenSigner`, and `IdentityProvider` protocols.
+- [x] **T-902** — `app/auth/ports.py` — `PasswordHasher`, `TokenSigner`, and `IdentityProvider` protocols.
 - [ ] **T-903** — `app/auth/adapters/argon2_hasher.py` — Argon2id hasher with rehash detection and no leaked provider exceptions.
 - [ ] **T-904** — `app/auth/adapters/jwt_signer.py` — RS256/EdDSA JWT signer with standard claims and 30s clock skew.
 - [ ] **T-905** — `app/auth/persistence.py` + migration — `UserRow` and `RefreshTokenRow` mapped classes translated to domain types at the boundary.

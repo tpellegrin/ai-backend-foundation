@@ -6,12 +6,16 @@ from app.auth.domain import (
     RefreshReuseDetectedError,
     RefreshToken,
 )
+from app.auth.ports import IdentityProvider, PasswordHasher, TokenSigner
 
 __all__ = [
     "AccessToken",
     "AuthenticatedUser",
     "Credentials",
+    "IdentityProvider",
     "InvalidCredentialsError",
+    "PasswordHasher",
     "RefreshReuseDetectedError",
     "RefreshToken",
+    "TokenSigner",
 ]
